@@ -17,7 +17,6 @@ return require("packer").startup(function(use)
     use { 'mbbill/undotree',                         commit = "0f1c9816975b5d7f87d5003a19c53c6fd2ff6f7f" }
     use { 'voldikss/vim-floaterm',                   commit = "a11b930f55324e9b05e2ef16511fe713f1b456a7" }
     use { 'terrortylor/nvim-comment',                commit = "e9ac16ab056695cad6461173693069ec070d2b23" } -- U
-    use { 'sindrets/diffview.nvim',                  commit = '4516612fe98ff56ae0415a259ff6361a89419b0a' } -- U
 
     -- ## THEME AND COLORS
     use { "catppuccin/nvim", as = "catppuccin",      tag = "v1.11.0" }
@@ -27,17 +26,10 @@ return require("packer").startup(function(use)
     -- codediff dependency
     use { 'MunifTanjim/nui.nvim',                    commit = "de740991c12411b663994b2860f1a4fd0937c130" }
 
-    -- ## LANGUAGE SERVICE
-    -- use { 'coder/claudecode.nvim',                   commit = '93f8e48b1f6cbf2469b378c20b3df4115252d379' }
-    -- claudecode.nvim dependency
-    -- use { 'folke/snacks.nvim',                       commit = 'fe7cfe9800a182274d0f868a74b7263b8c0c020b' }
-
     use { 'neovim/nvim-lspconfig',                   commit = "d696e36d5792daf828f8c8e8d4b9aa90c1a10c2a" }
     use { 'felpafel/inlay-hint.nvim',                commit = "ee8aa9806d1e160a2bc08b78ae60568fb6d9dbce" }
     use { 'mason-org/mason.nvim',                    commit = "57e5a8addb8c71fb063ee4acda466c7cf6ad2800", run = ":MasonUpdate" }
     use { 'williamboman/mason-lspconfig.nvim',       commit = "9f9c67795d0795a6e8612f5a899ca64a074a1076" }
-    -- use { 'github/copilot.vim',                      tag = "v1.58.0" }
-    -- use { 'CopilotC-Nvim/CopilotChat.nvim',          tag = "v4.7.4" }
     -- completion
     use { 'hrsh7th/nvim-cmp',                        commit = "d97d85e01339f01b842e6ec1502f639b080cb0fc" }
     use { 'hrsh7th/cmp-nvim-lsp',                    commit = "cbc7b02bb99fae35cb42f514762b89b5126651ef" }
