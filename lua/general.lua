@@ -297,10 +297,10 @@ local _ = (function()
         rectify_win_then(vim.cmd.ClaudeCode)
     end)
     -- close (hide) ai coder
-    noremap('n', '<leader>bc', function()
+    noremap('n', '<leader>bh', function()
         if is_aidiff_open() then
             vim.api.nvim_input("<C-w>gt")
-            vim.notify("<leader>by to open aidiff again", vim.log.levels.WARN)
+            vim.notify("<leader>bo to open aidiff again", vim.log.levels.WARN)
             return
         end
         if buftype() == "fileterm" then return end -- don't do anything if we are already in terminal
@@ -313,7 +313,7 @@ local _ = (function()
         vim.cmd.ClaudeCodeNotificationDismiss()
     end)
     -- open/accept diff
-    noremap('n', '<leader>by', function()
+       local open_or_accept_aidiff = function()
         -- see if the aidiff is currently visible
         if is_aidiff_open() then
             -- make sure no unsaved modifications in all opened windows
@@ -354,7 +354,9 @@ local _ = (function()
         -- open diff in new tabpage
         vim.cmd.ClaudeCodeOpenCodeDiff()
         vim.notify("opened aidiff", vim.log.levels.WARN)
-    end)
+    end
+    noremap('n', '<leader>bo', open_or_accept_aidiff)
+    noremap('t', '<leader>bo', open_or_accept_aidiff)
     -- deny diff
     noremap('n', '<leader>bn', function()
         -- note we allow denying without the diff open

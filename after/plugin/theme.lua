@@ -1,6 +1,5 @@
 local frappe = require("catppuccin.palettes").get_palette("frappe")
 local mocha = require("catppuccin.palettes").get_palette("mocha")
-local latte = require("catppuccin.palettes").get_palette("latte")
 
 require("catppuccin").setup({
     flavour = "auto", -- latte, frappe, macchiato, mocha
