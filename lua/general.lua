@@ -189,7 +189,14 @@ local _ = (function()
         if filetype == "NvimTree" then
             return "tree"
         end
+        if filetype == "claude-notify" then
+            return "notif"
+        end
         if buftype ~= "terminal" then
+            if vim.api.nvim_buf_get_name(bufnr or 0):match("claude[/\\]proposed$") ~= nil
+            then
+                return "aidiff"
+            end
             return "file"
         end
         if filetype == "floaterm" then
@@ -238,17 +245,32 @@ local _ = (function()
             vim.cmd("startinsert")
         end
     })
-    -- make the active window and the tree the only window open
+
+    -- if the current tab is the aidiff tab
+    local is_aidiff_open = function()
+        -- actually check visibility of all windows
+        for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+            local bufnr = vim.api.nvim_win_get_buf(winid)
+            if buftype(bufnr) == "aidiff" then
+                return true
+            end
+        end
+        return false
+    end
+    -- make the active window and the tree the only editor windows open
     local rectify_win_then = function(cb)
         local b = buftype()
-        if b == "tree" or b == "floaterm" then
-            print("operation not supported on tree or floaterm")
+        if b == "tree" or b == "floaterm" or is_aidiff_open() then
+            vim.notify("operation not supported on current window", vim.log.levels.WARN)
             return
         end
         local window = vim.api.nvim_get_current_win();
-        for _, winid in ipairs(vim.api.nvim_list_wins()) do
+        for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
             if winid ~= window then
-                vim.api.nvim_win_hide(winid)
+                local bufnr = vim.api.nvim_win_get_buf(winid)
+                if buftype(bufnr) ~= "notif" then
+                    vim.api.nvim_win_hide(winid)
+                end
             end
         end
         vim.cmd.NvimTreeOpen()
@@ -268,33 +290,93 @@ local _ = (function()
     noremap('n', '<leader>dl', function() duplicate_view(true) end)
     noremap('n', '<leader>dh', function() duplicate_view(false) end)
 
-    -- open file terminal
+    -- ## AI Coder integration
+    -- open ai coder
     noremap('n', '<leader>bb', function()
         if buftype() == "fileterm" then return end -- don't do anything if we are already in terminal
         rectify_win_then(vim.cmd.ClaudeCode)
     end)
-    -- close file terminal
+    -- close (hide) ai coder
     noremap('n', '<leader>bc', function()
+        if is_aidiff_open() then
+            vim.api.nvim_input("<C-w>gt")
+            vim.notify("<leader>by to open aidiff again", vim.log.levels.WARN)
+            return
+        end
         if buftype() == "fileterm" then return end -- don't do anything if we are already in terminal
         for _, winid in ipairs(vim.api.nvim_list_wins()) do
-            bufnr = vim.api.nvim_win_get_buf(winid)
+            local bufnr = vim.api.nvim_win_get_buf(winid)
             if buftype(bufnr) == "fileterm" then
                 vim.api.nvim_win_hide(winid)
             end
         end
+        vim.cmd.ClaudeCodeNotificationDismiss()
     end)
-    -- accept diff
+    -- open/accept diff
     noremap('n', '<leader>by', function()
-        vim.cmd.ClaudeCodeDiffAccept()
+        -- see if the aidiff is currently visible
+        if is_aidiff_open() then
+            -- make sure no unsaved modifications in all opened windows
+            for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+                local bufnr = vim.api.nvim_win_get_buf(winid)
+                local buft = buftype(bufnr)
+                if buft == "aidiff" or buft == "file" then
+                    if vim.bo[bufnr].modified then
+                        vim.notify("diff is unsaved, must save before accepting", vim.log.levels.WARN)
+                        return
+                    end
+                end
+            end
+            -- close the diff and accept it
+            vim.cmd.CodeDiff()
+            vim.cmd.ClaudeCodeDiffAccept()
+            vim.defer_fn(function()
+                -- close any dangling aidiff buffers
+                for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+                    if buftype(bufnr) == "aidiff" then
+                        vim.api.nvim_buf_delete(bufnr, {force=false})
+                    end
+                end
+            end, 1000)
+            vim.notify("accepted aidiff", vim.log.levels.WARN)
+            return
+        end
+        for _, winid in ipairs(vim.api.nvim_list_wins()) do
+            local bufnr = vim.api.nvim_win_get_buf(winid)
+            if buftype(bufnr) == "aidiff" then
+                -- if diff buf exists, we can likely go to it
+                -- with C-Wgt (next tabpage)
+                vim.api.nvim_input("<C-w>gt")
+                vim.notify("showing aidiff", vim.log.levels.WARN)
+                return
+            end
+        end
+        -- open diff in new tabpage
+        vim.cmd.ClaudeCodeOpenCodeDiff()
+        vim.notify("opened aidiff", vim.log.levels.WARN)
     end)
     -- deny diff
     noremap('n', '<leader>bn', function()
-        vim.cmd.ClaudeCodeDiffDeny()
+        -- note we allow denying without the diff open
+        -- say we forgot some instruction and want to deny the output
+        -- without checking
+        if is_aidiff_open() then
+            -- force close the buffer
+            for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+                if buftype(bufnr) == "aidiff" then
+                    vim.api.nvim_buf_delete(bufnr, {force=true})
+                end
+            end
+            vim.cmd.CodeDiff()
+            vim.cmd.ClaudeCodeDiffDeny()
+            return
+        end
+        vim.notify("denied aidiff", vim.log.levels.WARN)
     end)
-    -- send to terminal
+    -- send to aicoder
     noremap('n', '<leader>bl', function()
         local b = buftype()
-        if b == "fileterm" then return end -- don't do anything if we are already in terminal
+        if b == "fileterm" or is_aidiff_open() then return end -- don't do anything if we are already in terminal
         if b == "tree" then
             vim.cmd.ClaudeCodeTreeAdd()
             vim.cmd.ClaudeCodeFocus()
@@ -302,6 +384,20 @@ local _ = (function()
         end
         rectify_win_then(function()
             vim.cmd("ClaudeCodeAdd %")
+            vim.defer_fn(function()
+                if buftype() ~= "fileterm" then
+                    vim.cmd("stopinsert")
+                    vim.api.nvim_input("<C-w>l")
+                    vim.cmd("startinsert")
+                end
+            end, 100)
+        end)
+    end)
+    noremap('v', '<leader>bl', function()
+        local b = buftype()
+        if b == "fileterm" or b == "tree" or is_aidiff_open() then return end -- don't do anything if we are already in terminal
+        rectify_win_then(function()
+            vim.api.nvim_input("gv<cmd>ClaudeCodeSend<cr>")
             vim.defer_fn(function()
                 if buftype() ~= "fileterm" then
                     vim.cmd("stopinsert")
