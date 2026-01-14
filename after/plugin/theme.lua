@@ -1,5 +1,6 @@
 local frappe = require("catppuccin.palettes").get_palette("frappe")
 local mocha = require("catppuccin.palettes").get_palette("mocha")
+local latte = require("catppuccin.palettes").get_palette("latte")
 
 require("catppuccin").setup({
     flavour = "auto", -- latte, frappe, macchiato, mocha
@@ -84,6 +85,14 @@ require("catppuccin").setup({
             Floaterm = { bg = frappe.base },
             FloatermNC = { bg = frappe.crust },
             FloatermBorder = { bg = frappe.base },
+
+            -- diffs
+            -- DiffDelete = { fg = "#53394d", bg = mocha.base }, -- 25% mocha.red on mocha.base
+            -- DiffAdd = { bg = "#394545"}, -- 20% mocha.green on mocha.base
+            -- DiffChange = { bg = "#53394d" }, -- 25% mocha.red on mocha.base
+            -- DiffText = { bg = "#475951"}, -- 30% mocha.green on mocha.base
+            -- DiffChange = { bg = "#554344"},
+            -- DiffText = { bg = "#554344"},
         }
     end,
     default_integrations = true,
@@ -124,3 +133,6 @@ require("catppuccin").setup({
     compile_path = vim.fn.stdpath("config") .. "/cache/catppuccin",
 })
 vim.cmd.colorscheme('catppuccin')
+
+require("codediff").setup {
+}

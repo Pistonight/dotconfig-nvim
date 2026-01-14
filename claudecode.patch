@@ -1,0 +1,500 @@
+From b7535d16c8c368f3801659821dab35d795a13ffb Mon Sep 17 00:00:00 2001
+From: Pistonight <pistonknight@outlook.com>
+Date: Tue, 13 Jan 2026 23:11:58 -0800
+Subject: [PATCH] patch on 2026-01-13
+
+---
+ lua/claudecode/diff.lua | 368 ++++++++++++++++++++--------------------
+ lua/claudecode/init.lua |   7 +
+ 2 files changed, 192 insertions(+), 183 deletions(-)
+
+diff --git a/lua/claudecode/diff.lua b/lua/claudecode/diff.lua
+index 7e1b8f0..84411e5 100644
+--- a/lua/claudecode/diff.lua
++++ b/lua/claudecode/diff.lua
+@@ -549,15 +549,24 @@ local function load_original_buffer(original_win, old_file_path, is_new_file, ex
+   return vim.api.nvim_win_get_buf(original_win)
+ end
+ 
+----Create the proposed side split, set diff, filetype, context, and terminal focus/width
+----@param original_win NvimWin
+----@param original_buf NvimBuf
+----@param new_buf NvimBuf
+----@param old_file_path string
+----@param tab_name string
+----@param terminal_win_in_new_tab NvimWin|nil
+----@param target_win_for_meta NvimWin
+----@return NvimWin new_win
++---@type table|nil Latest diff state for codediff.nvim integration
++---@field original_path string Path to the original temp file
++---@field proposed_path string Path to the proposed temp file
++---@field tab_name string The diff identifier
++---@field old_file_path string The actual file path being diffed
++local latest_diff = nil
++
++---Save original and proposed files to ~/.vim/claude for codediff.nvim integration
++---Does NOT open diff view immediately - use ClaudeCodeOpenCodeDiff for that
++---@param original_win NvimWin (unused, kept for compatibility)
++---@param original_buf NvimBuf (unused, kept for compatibility)
++---@param new_buf NvimBuf Buffer containing the proposed changes
++---@param old_file_path string Path to the original file
++---@param tab_name string The diff identifier
++---@param terminal_win_in_new_tab NvimWin|nil (unused, kept for compatibility)
++---@param target_win_for_meta NvimWin (unused, kept for compatibility)
++---@return boolean success Whether the files were saved successfully
++---@return string|nil error Error message if failed
+ local function setup_new_buffer(
+   original_win,
+   original_buf,
+@@ -567,68 +576,62 @@ local function setup_new_buffer(
+   terminal_win_in_new_tab,
+   target_win_for_meta
+ )
+-  vim.api.nvim_set_current_win(original_win)
+-  vim.cmd("diffthis")
++  -- Suppress unused variable warnings
++  local _ = original_win and original_buf and terminal_win_in_new_tab and target_win_for_meta
+ 
+-  create_split()
+-  local new_win = vim.api.nvim_get_current_win()
+-  vim.api.nvim_win_set_buf(new_win, new_buf)
+-
+-  local original_ft = detect_filetype(old_file_path, original_buf)
+-  if original_ft and original_ft ~= "" then
+-    vim.api.nvim_set_option_value("filetype", original_ft, { buf = new_buf })
++  local dir, dir_err = M.get_claude_diff_dir()
++  if not dir then
++    return false, dir_err
+   end
+-  vim.cmd("diffthis")
+-
+-  vim.cmd("wincmd =")
+-
+-  vim.api.nvim_set_current_win(new_win)
+-
+-  vim.b[new_buf].claudecode_diff_tab_name = tab_name
+-  vim.b[new_buf].claudecode_diff_new_win = new_win
+-  vim.b[new_buf].claudecode_diff_target_win = target_win_for_meta
+ 
+-  if config and config.diff_opts and config.diff_opts.keep_terminal_focus then
+-    vim.schedule(function()
+-      if terminal_win_in_new_tab and vim.api.nvim_win_is_valid(terminal_win_in_new_tab) then
+-        vim.api.nvim_set_current_win(terminal_win_in_new_tab)
+-        vim.cmd("startinsert")
+-        return
+-      end
++  -- Fixed paths - reused on every cycle (no extension)
++  local original_path = dir .. "/original"
++  local proposed_path = dir .. "/proposed"
++
++  -- Read original file content (or empty for new files)
++  local original_content = ""
++  if vim.fn.filereadable(old_file_path) == 1 then
++    local lines = vim.fn.readfile(old_file_path)
++    original_content = table.concat(lines, "\n")
++    if #lines > 0 then
++      original_content = original_content .. "\n"
++    end
++  end
+ 
+-      local terminal_win = find_claudecode_terminal_window()
+-      if terminal_win then
+-        vim.api.nvim_set_current_win(terminal_win)
+-        vim.cmd("startinsert")
+-      end
+-    end)
++  -- Write original file
++  local orig_file = io.open(original_path, "w")
++  if not orig_file then
++    return false, "Failed to write original file to " .. original_path
++  end
++  orig_file:write(original_content)
++  orig_file:close()
++
++  -- Get proposed content from buffer
++  local new_lines = vim.api.nvim_buf_get_lines(new_buf, 0, -1, false)
++  local new_content = table.concat(new_lines, "\n")
++  if #new_lines > 0 then
++    new_content = new_content .. "\n"
+   end
+ 
+-  if terminal_win_in_new_tab and vim.api.nvim_win_is_valid(terminal_win_in_new_tab) then
+-    local terminal_config = config.terminal or {}
+-    local split_width = terminal_config.split_width_percentage or 0.30
+-    local total_width = vim.o.columns
+-    local terminal_width = math.floor(total_width * split_width)
+-    vim.api.nvim_win_set_width(terminal_win_in_new_tab, terminal_width)
+-  else
+-    local terminal_win = find_claudecode_terminal_window()
+-    if terminal_win and vim.api.nvim_win_is_valid(terminal_win) then
+-      local current_tab = vim.api.nvim_get_current_tabpage()
+-      local term_tab = nil
+-      pcall(function()
+-        term_tab = vim.api.nvim_win_get_tabpage(terminal_win)
+-      end)
+-      if term_tab == current_tab then
+-        local terminal_config = config.terminal or {}
+-        local split_width = terminal_config.split_width_percentage or 0.30
+-        local total_width = vim.o.columns
+-        local terminal_width = math.floor(total_width * split_width)
+-        pcall(vim.api.nvim_win_set_width, terminal_win, terminal_width)
+-      end
+-    end
++  -- Write proposed file
++  local prop_file = io.open(proposed_path, "w")
++  if not prop_file then
++    return false, "Failed to write proposed file to " .. proposed_path
+   end
++  prop_file:write(new_content)
++  prop_file:close()
++
++  -- Store latest diff state
++  latest_diff = {
++    original_path = original_path,
++    proposed_path = proposed_path,
++    tab_name = tab_name,
++    old_file_path = old_file_path,
++  }
++
++  logger.debug("diff", "Saved diff files to " .. dir .. " for tab: " .. tab_name)
+ 
+-  return new_win
++  return true, nil
+ end
+ 
+ ---Open diff using native Neovim functionality
+@@ -702,6 +705,29 @@ end
+ ---@type table<string, table>
+ local active_diffs = {}
+ 
++
++---Get the ~/.vim/claude directory, creating it if needed
++---@return string|nil path The directory path, or nil on error
++---@return string|nil error Error message if failed
++function M.get_claude_diff_dir()
++  local home = os.getenv("HOME") or os.getenv("USERPROFILE")
++  if not home then
++    return nil, "Could not determine HOME or USERPROFILE directory"
++  end
++
++  local dir = home .. "/.vim/claude"
++  local stat = vim.loop.fs_stat(dir)
++
++  if not stat then
++    local ok, err = pcall(vim.fn.mkdir, dir, "p")
++    if not ok then
++      return nil, "Failed to create directory " .. dir .. ": " .. tostring(err)
++    end
++  end
++
++  return dir, nil
++end
++
+ ---Register diff state for tracking
+ ---@param tab_name string Unique identifier for the diff
+ ---@param diff_data table Diff state data
+@@ -710,9 +736,9 @@ function M._register_diff_state(tab_name, diff_data)
+ end
+ 
+ ---Resolve diff as saved (user accepted changes)
++---Reads the proposed content from the temp file in ~/.vim/claude
+ ---@param tab_name string The diff identifier
+----@param buffer_id number The buffer that was saved
+-function M._resolve_diff_as_saved(tab_name, buffer_id)
++function M._resolve_diff_as_saved(tab_name)
+   local diff_data = active_diffs[tab_name]
+   if not diff_data or diff_data.status ~= "pending" then
+     return
+@@ -720,16 +746,24 @@ function M._resolve_diff_as_saved(tab_name, buffer_id)
+ 
+   logger.debug("diff", "Accepting diff for", tab_name)
+ 
+-  -- Get content from buffer
+-  local content_lines = vim.api.nvim_buf_get_lines(buffer_id, 0, -1, false)
++  -- Read content from the proposed temp file (user may have edited it in codediff)
++  if not latest_diff or not latest_diff.proposed_path then
++    logger.error("diff", "No proposed file path available")
++    return
++  end
++
++  local proposed_path = latest_diff.proposed_path
++  if vim.fn.filereadable(proposed_path) ~= 1 then
++    logger.error("diff", "Proposed file not readable:", proposed_path)
++    return
++  end
++
++  local content_lines = vim.fn.readfile(proposed_path)
+   local final_content = table.concat(content_lines, "\n")
+-  -- Add trailing newline if the buffer has one
+-  if #content_lines > 0 and vim.api.nvim_buf_get_option(buffer_id, "eol") then
++  if #content_lines > 0 then
+     final_content = final_content .. "\n"
+   end
+ 
+-  -- Do not modify windows/tabs here; wait for explicit close_tab tool call to clean up UI
+-
+   -- Create MCP-compliant response
+   local result = {
+     content = {
+@@ -839,45 +873,45 @@ end
+ local function register_diff_autocmds(tab_name, new_buffer)
+   local autocmd_ids = {}
+ 
+-  -- Handle :w command to accept diff changes (replaces both BufWritePost and BufWriteCmd)
+-  autocmd_ids[#autocmd_ids + 1] = vim.api.nvim_create_autocmd("BufWriteCmd", {
+-    group = get_autocmd_group(),
+-    buffer = new_buffer,
+-    callback = function()
+-      M._resolve_diff_as_saved(tab_name, new_buffer)
+-      -- Prevent actual file write since we're handling it through MCP
+-      return true
+-    end,
+-  })
++  -- -- Handle :w command to accept diff changes (replaces both BufWritePost and BufWriteCmd)
++  -- autocmd_ids[#autocmd_ids + 1] = vim.api.nvim_create_autocmd("BufWriteCmd", {
++  --   group = get_autocmd_group(),
++  --   buffer = new_buffer,
++  --   callback = function()
++  --     M._resolve_diff_as_saved(tab_name, new_buffer)
++  --     -- Prevent actual file write since we're handling it through MCP
++  --     return true
++  --   end,
++  -- })
+ 
+   -- Buffer deletion monitoring for rejection (multiple events to catch all deletion methods)
+ 
+-  -- BufDelete: When buffer is deleted with :bdelete, :bwipeout, etc.
+-  autocmd_ids[#autocmd_ids + 1] = vim.api.nvim_create_autocmd("BufDelete", {
+-    group = get_autocmd_group(),
+-    buffer = new_buffer,
+-    callback = function()
+-      M._resolve_diff_as_rejected(tab_name)
+-    end,
+-  })
+-
+-  -- BufUnload: When buffer is unloaded (covers more scenarios)
+-  autocmd_ids[#autocmd_ids + 1] = vim.api.nvim_create_autocmd("BufUnload", {
+-    group = get_autocmd_group(),
+-    buffer = new_buffer,
+-    callback = function()
+-      M._resolve_diff_as_rejected(tab_name)
+-    end,
+-  })
+-
+-  -- BufWipeout: When buffer is wiped out completely
+-  autocmd_ids[#autocmd_ids + 1] = vim.api.nvim_create_autocmd("BufWipeout", {
+-    group = get_autocmd_group(),
+-    buffer = new_buffer,
+-    callback = function()
+-      M._resolve_diff_as_rejected(tab_name)
+-    end,
+-  })
++  -- -- BufDelete: When buffer is deleted with :bdelete, :bwipeout, etc.
++  -- autocmd_ids[#autocmd_ids + 1] = vim.api.nvim_create_autocmd("BufDelete", {
++  --   group = get_autocmd_group(),
++  --   buffer = new_buffer,
++  --   callback = function()
++  --     M._resolve_diff_as_rejected(tab_name)
++  --   end,
++  -- })
++
++  -- -- BufUnload: When buffer is unloaded (covers more scenarios)
++  -- autocmd_ids[#autocmd_ids + 1] = vim.api.nvim_create_autocmd("BufUnload", {
++  --   group = get_autocmd_group(),
++  --   buffer = new_buffer,
++  --   callback = function()
++  --     M._resolve_diff_as_rejected(tab_name)
++  --   end,
++  -- })
++
++  -- -- BufWipeout: When buffer is wiped out completely
++  -- autocmd_ids[#autocmd_ids + 1] = vim.api.nvim_create_autocmd("BufWipeout", {
++  --   group = get_autocmd_group(),
++  --   buffer = new_buffer,
++  --   callback = function()
++  --     M._resolve_diff_as_rejected(tab_name)
++  --   end,
++  -- })
+ 
+   -- Note: We intentionally do NOT monitor old_buffer for deletion
+   -- because it's the actual file buffer and shouldn't trigger diff rejection
+@@ -892,7 +926,7 @@ end
+ ---@param tab_name string The diff identifier
+ ---@param is_new_file boolean Whether this is a new file (doesn't exist yet)
+ ---@param terminal_win_in_new_tab NvimWin|nil Terminal window in new tab if created
+----@param existing_buffer NvimBuf|nil Existing buffer for the file if already loaded
++---@param existing_buffer NvimBuf|nil Existing buffer for the file if already loaded (unused, kept for compatibility)
+ ---@return DiffLayoutInfo layout Info about the created diff layout
+ function M._create_diff_view_from_window(
+   target_window,
+@@ -903,73 +937,35 @@ function M._create_diff_view_from_window(
+   terminal_win_in_new_tab,
+   existing_buffer
+ )
+-  local original_buffer_created_by_plugin = false
+-
+-  -- If no target window provided, create a new window in suitable location
+-  if not target_window then
+-    if terminal_win_in_new_tab then
+-      -- We're already in the main area after display_terminal_in_new_tab
+-      target_window = vim.api.nvim_get_current_win()
+-    else
+-      -- Try to create a new window in the main area
+-      vim.cmd("wincmd t") -- Go to top-left
+-      vim.cmd("wincmd l") -- Move right (to middle if layout is left|middle|right)
+-
+-      local buf = vim.api.nvim_win_get_buf(vim.api.nvim_get_current_win())
+-      local buftype = vim.api.nvim_buf_get_option(buf, "buftype")
+-      local filetype = vim.api.nvim_buf_get_option(buf, "filetype")
+-
+-      if buftype == "terminal" or buftype == "prompt" or filetype == "neo-tree" or filetype == "snacks_picker_list" then
+-        create_split()
+-      end
+-
+-      target_window = vim.api.nvim_get_current_win()
+-    end
+-  else
+-    vim.api.nvim_set_current_win(target_window)
+-  end
+-
+-  -- Decide window placement for the original file
+-  local choice = choose_original_window(target_window, old_file_path, is_new_file, terminal_win_in_new_tab)
+-
+-  local original_window
+-  if choice.decision == "split" then
+-    vim.api.nvim_set_current_win(target_window)
+-    create_split()
+-    original_window = vim.api.nvim_get_current_win()
+-  else
+-    original_window = choice.original_win
+-  end
+-
+-  -- For new files, prefer reusing an existing empty buffer in the chosen window
+-  local original_buffer
+-  if is_new_file and choice.reused_buf and vim.api.nvim_buf_is_valid(choice.reused_buf) then
+-    original_buffer = choice.reused_buf
+-    original_buffer_created_by_plugin = false
+-  else
+-    if is_new_file then
+-      original_buffer_created_by_plugin = true
+-    end
+-    -- Load the original-side buffer into the chosen window
+-    original_buffer = load_original_buffer(original_window, old_file_path, is_new_file, existing_buffer)
+-  end
+-
+-  -- Set up the proposed buffer and finalize the diff layout
+-  local new_win = setup_new_buffer(
+-    original_window,
+-    original_buffer,
++  -- Suppress unused variable warnings
++  local _ = target_window and is_new_file and terminal_win_in_new_tab and existing_buffer
++
++  -- Save files to ~/.vim/claude for codediff.nvim integration
++  -- Does NOT open diff view - user calls ClaudeCodeOpenCodeDiff for that
++  local success, err = setup_new_buffer(
++    nil, -- original_win (unused)
++    nil, -- original_buf (unused)
+     new_buffer,
+     old_file_path,
+     tab_name,
+-    terminal_win_in_new_tab,
+-    target_window
++    nil, -- terminal_win_in_new_tab (unused)
++    nil -- target_win_for_meta (unused)
+   )
+ 
++  if not success then
++    error({
++      code = -32000,
++      message = "Failed to save diff files",
++      data = err,
++    })
++  end
++
++  -- Return minimal info - no windows/buffers created for diff view
+   return {
+-    new_window = new_win,
+-    target_window = original_window,
+-    original_buffer = original_buffer,
+-    original_buffer_created_by_plugin = original_buffer_created_by_plugin,
++    new_window = nil,
++    target_window = nil,
++    original_buffer = nil,
++    original_buffer_created_by_plugin = false,
+   }
+ end
+ 
+@@ -1400,32 +1396,38 @@ function M.reload_file_buffers_manual(file_path, original_cursor_pos)
+   return reload_file_buffers(file_path, original_cursor_pos)
+ end
+ 
++---Open the latest diff with codediff.nvim
++---Uses :CodeDiff file <original> <proposed> command
++function M.open_code_diff()
++  if not latest_diff then
++    vim.notify("No diff available to open", vim.log.levels.WARN)
++    return
++  end
++
++  local cmd = string.format("CodeDiff file %s %s", latest_diff.original_path, latest_diff.proposed_path)
++  vim.cmd(cmd)
++end
++
+ ---Accept the current diff (user command version)
+----This function reads the diff context from buffer variables
++---Reads the proposed content from the temp file and sends to Claude via MCP
+ function M.accept_current_diff()
+-  local current_buffer = vim.api.nvim_get_current_buf()
+-  local tab_name = vim.b[current_buffer].claudecode_diff_tab_name
+-
+-  if not tab_name then
+-    vim.notify("No active diff found in current buffer", vim.log.levels.WARN)
++  if not latest_diff then
++    vim.notify("No active diff found", vim.log.levels.WARN)
+     return
+   end
+ 
+-  M._resolve_diff_as_saved(tab_name, current_buffer)
++  M._resolve_diff_as_saved(latest_diff.tab_name)
+ end
+ 
+ ---Deny/reject the current diff (user command version)
+----This function reads the diff context from buffer variables
++---Sends rejection to Claude via MCP
+ function M.deny_current_diff()
+-  local current_buffer = vim.api.nvim_get_current_buf()
+-  local tab_name = vim.b[current_buffer].claudecode_diff_tab_name
+-
+-  if not tab_name then
+-    vim.notify("No active diff found in current buffer", vim.log.levels.WARN)
++  if not latest_diff then
++    vim.notify("No active diff found", vim.log.levels.WARN)
+     return
+   end
+ 
+-  -- Do not close windows/tabs here; just mark as rejected.
++  local tab_name = latest_diff.tab_name
+   M._resolve_diff_as_rejected(tab_name)
+ end
+ 
+diff --git a/lua/claudecode/init.lua b/lua/claudecode/init.lua
+index c4b7744..65854f4 100644
+--- a/lua/claudecode/init.lua
++++ b/lua/claudecode/init.lua
+@@ -1042,6 +1042,13 @@ function M._create_commands()
+     desc = "Deny/reject the current diff changes",
+   })
+ 
++  vim.api.nvim_create_user_command("ClaudeCodeOpenCodeDiff", function()
++    local diff = require("claudecode.diff")
++    diff.open_code_diff()
++  end, {
++    desc = "Open the latest diff with codediff.nvim",
++  })
++
+   vim.api.nvim_create_user_command("ClaudeCodeSelectModel", function(opts)
+     local cmd_args = opts.args and opts.args ~= "" and opts.args or nil
+     M.open_with_model(cmd_args)
+-- 
+2.50.1
+

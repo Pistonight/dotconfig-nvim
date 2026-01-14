@@ -11,8 +11,9 @@ vim.opt.shiftwidth = 4   -- Indent 4
 vim.opt.tabstop = 4
 vim.opt.softtabstop = 4
 vim.opt.smartindent = true
-
 vim.opt.wrap = false
+
+vim.opt.fillchars:append { diff = "╱" }
 
 vim.opt.termguicolors = true -- colors
 -- undo dir
@@ -29,14 +30,20 @@ end
 
 -- folds
 vim.opt.foldenable = false   -- no fold at startup
-vim.wo.foldmethod = 'expr'
-vim.wo.foldexpr = 'v:lua.vim.treesitter.foldexpr()'
+vim.opt.foldlevel = 99
+vim.opt.foldmethod = 'expr'
+vim.opt.foldexpr = 'v:lua.vim.treesitter.foldexpr()'
 -- search
 vim.opt.hlsearch = true
 vim.opt.incsearch = true -- should be the default
 -- scrolling
 vim.opt.scrolloff = 8
 vim.opt.sidescrolloff = 8
+-- diff
+vim.cmd([[
+:set diffopt+=internal,algorithm:patience,indent-heuristic
+:set diffopt+=linematch:60
+]])
 
 -- Floaterm style
 vim.g.floaterm_title = 'Terminal [$1/$2]'
@@ -127,28 +134,19 @@ local _ = (function()
     -- copy to system clipboard (see extra.lua)
     noremap('v', '<leader>y', '"ay')
     -- swap left and right buffers
-    noremap('n', '<leader>w', '<cmd>NvimTreeClose<cr><C-w>r<cmd>NvimTreeOpen<cr><C-W>l')
-    -- duplicate split view to other side
-    noremap('n', '<leader>dl', '<C-w>l<cmd>q<cr><C-w>v') --left to right
-    noremap('n', '<leader>dh', '<C-w>h<cmd>q<cr><C-w>v') --right to left
+    noremap('n', '<leader>w', function()
+        vim.cmd.NvimTreeClose()
+        vim.api.nvim_input("<C-w>r")
+        vim.defer_fn(function ()
+            vim.cmd.NvimTreeOpen()
+            vim.api.nvim_input("<C-w>l")
+        end, 1)
+    end)
     -- convert between Rust /// doc and JS /** doc */
     noremap('n', '<leader>J', '0f/wBR/**<esc>A */<esc>')
     noremap('v', '<leader>J', '<esc>\'<lt>O<esc>0C/**<esc>\'>o<esc>0C */<esc><cmd>\'<lt>,\'>s/\\/\\/\\// */<cr>gv`<lt>koj=<cmd>nohl<cr>')
     noremap('n', '<leader>R', '0f*wBR///<esc>A<esc>xxx')
     noremap('v', '<leader>R', '<esc>\'<lt>dd\'>ddgv<esc><cmd>\'<lt>,\'>s/\\*/\\/\\/\\//<cr>gv`<lt>koj=<cmd>nohl<cr>')
-    -- copilot
-    noremap('i', '<A-Tab>', '<Plug>(copilot-accept-line)')
-    -- toggle floaterm
-    noremap('n', [[<C-\>]], function() vim.cmd.FloatermToggle() end)
-    noremap('t', [[<C-\>]], vim.cmd.FloatermToggle)
-    -- new floaterm terminal
-    noremap('n', [[<leader><C-\>]], vim.cmd.FloatermNew)
-    noremap('t', [[<leader><C-\>]], [[<C-\><C-n><cmd>FloatermNew<CR>]])
-    -- back to normal mode with Ctrl-w
-    noremap('t', '<C-w>', [[<C-\><C-n>]])
-    -- cycle through terminals
-    noremap('n', '<C-n>', vim.cmd.FloatermNext)
-    noremap('t', '<C-n>', vim.cmd.FloatermNext)
     -- jumping to diagnostics
     local show_diag_float = function()
         vim.defer_fn(function()
@@ -176,6 +174,144 @@ local _ = (function()
     noremap('v', '<leader>c', "V<cmd>'<,'>CommentToggle<cr>gv")
     -- toggle undotree
     noremap('n', '<leader>u', vim.cmd.UndotreeToggle)
+
+    -- ## window integration
+    local buftype = function(bufnr)
+        local filetype
+        local buftype
+        if bufnr ~= nil then
+            filetype = vim.bo[bufnr].filetype
+            buftype = vim.bo[bufnr].buftype
+        else
+            filetype = vim.bo.filetype
+            buftype = vim.bo.buftype
+        end
+        if filetype == "NvimTree" then
+            return "tree"
+        end
+        if buftype ~= "terminal" then
+            return "file"
+        end
+        if filetype == "floaterm" then
+            return "floaterm"
+        end
+        -- the only non-floaterm terminal environment
+        -- we have right now is claude/ai
+        return "fileterm"
+    end
+    -- toggle floaterm
+    noremap('n', [[<C-\>]], vim.cmd.FloatermToggle)
+    noremap('t', [[<C-\>]], vim.cmd.FloatermToggle)
+    -- (inside floaterm only) new floaterm
+    noremap('t', [[<leader><C-\>]], function()
+        if buftype() ~= "floaterm" then return end
+        vim.cmd.FloatermNew();
+    end)
+    noremap('n', [[<leader><C-\>]], function()
+        if buftype() ~= "floaterm" then return end
+        vim.cmd.FloatermNew();
+    end)
+    -- escape terminal (claude)
+    noremap('n', '<esc>', function()
+        if buftype() ~= "fileterm" then return end
+        vim.cmd("close")
+    end)
+    noremap('t', '<C-w>', function()
+        vim.cmd("stopinsert");
+        -- for non-floaterm, also execute a C-w to be ready to switch focus
+        -- defer to let UI update (to show "NORMAL")
+        vim.defer_fn(function()
+            vim.api.nvim_input("<C-w>")
+        end, 30)
+    end)
+    -- cycle through terminals when floaterm is open
+    local cycle_floaterm = function()
+        if buftype() ~= "floaterm" then return end
+        vim.cmd.FloatermNext()
+    end
+    noremap('t', '<C-n>', cycle_floaterm)
+    noremap('n', '<C-n>', cycle_floaterm)
+    -- auto startinsert when entering non-floaterm
+    vim.api.nvim_create_autocmd("BufEnter", {
+        callback = function()
+            if buftype() ~= "fileterm" then return end
+            vim.cmd("startinsert")
+        end
+    })
+    -- make the active window and the tree the only window open
+    local rectify_win_then = function(cb)
+        local b = buftype()
+        if b == "tree" or b == "floaterm" then
+            print("operation not supported on tree or floaterm")
+            return
+        end
+        local window = vim.api.nvim_get_current_win();
+        for _, winid in ipairs(vim.api.nvim_list_wins()) do
+            if winid ~= window then
+                vim.api.nvim_win_hide(winid)
+            end
+        end
+        vim.cmd.NvimTreeOpen()
+        vim.api.nvim_input("<C-w>l")
+        vim.defer_fn(cb, 30)
+    end
+    -- duplicate split view to other side
+    local duplicate_view = function(right)
+        rectify_win_then(function()
+            if right then
+                vim.api.nvim_input('<C-w>v<C-W>l')
+            else
+                vim.api.nvim_input('<C-w>v')
+            end
+        end)
+    end
+    noremap('n', '<leader>dl', function() duplicate_view(true) end)
+    noremap('n', '<leader>dh', function() duplicate_view(false) end)
+
+    -- open file terminal
+    noremap('n', '<leader>bb', function()
+        if buftype() == "fileterm" then return end -- don't do anything if we are already in terminal
+        rectify_win_then(vim.cmd.ClaudeCode)
+    end)
+    -- close file terminal
+    noremap('n', '<leader>bc', function()
+        if buftype() == "fileterm" then return end -- don't do anything if we are already in terminal
+        for _, winid in ipairs(vim.api.nvim_list_wins()) do
+            bufnr = vim.api.nvim_win_get_buf(winid)
+            if buftype(bufnr) == "fileterm" then
+                vim.api.nvim_win_hide(winid)
+            end
+        end
+    end)
+    -- accept diff
+    noremap('n', '<leader>by', function()
+        vim.cmd.ClaudeCodeDiffAccept()
+    end)
+    -- deny diff
+    noremap('n', '<leader>bn', function()
+        vim.cmd.ClaudeCodeDiffDeny()
+    end)
+    -- send to terminal
+    noremap('n', '<leader>bl', function()
+        local b = buftype()
+        if b == "fileterm" then return end -- don't do anything if we are already in terminal
+        if b == "tree" then
+            vim.cmd.ClaudeCodeTreeAdd()
+            vim.cmd.ClaudeCodeFocus()
+            return
+        end
+        rectify_win_then(function()
+            vim.cmd("ClaudeCodeAdd %")
+            vim.defer_fn(function()
+                if buftype() ~= "fileterm" then
+                    vim.cmd("stopinsert")
+                    vim.api.nvim_input("<C-w>l")
+                    vim.cmd("startinsert")
+                end
+            end, 100)
+        end)
+    end)
+
 
     -- Other key mappings, see
     -- telescope.lua
