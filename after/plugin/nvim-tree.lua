@@ -119,31 +119,7 @@ require("nvim-tree").setup({
         }
     }
 })
-local frappe = require("catppuccin.palettes").get_palette("frappe")
-local mocha = require("catppuccin.palettes").get_palette("mocha")
 require("codediff").setup {
-      --         highlights = {
-      --   -- Line-level: accepts highlight group names or hex colors (e.g., "#2ea043")
-      --   line_insert = mocha.green,      -- Line-level insertions
-      --   line_delete = "DiffDelete",   -- Line-level deletions
-      --
-      --   -- Character-level: accepts highlight group names or hex colors
-      --   -- If specified, these override char_brightness calculation
-      --   char_insert = mocha.yellow,            -- Character-level insertions (nil = auto-derive)
-      --   char_delete = nil,            -- Character-level deletions (nil = auto-derive)
-      --
-      --   -- Brightness multiplier (only used when char_insert/char_delete are nil)
-      --   -- nil = auto-detect based on background (1.4 for dark, 0.92 for light)
-      --   char_brightness = nil,        -- Auto-adjust based on your colorscheme
-      --
-      --   -- Conflict sign highlights (for merge conflict views)
-      --   -- Accepts highlight group names or hex colors (e.g., "#f0883e")
-      --   -- nil = use default fallback chain
-      --   conflict_sign = nil,          -- Unresolved: DiagnosticSignWarn -> #f0883e
-      --   conflict_sign_resolved = nil, -- Resolved: Comment -> #6e7681
-      --   conflict_sign_accepted = nil, -- Accepted: GitSignsAdd -> DiagnosticSignOk -> #3fb950
-      --   conflict_sign_rejected = nil, -- Rejected: GitSignsDelete -> DiagnosticSignError -> #f85149
-      -- },
     keymaps = {
         view = {
             quit = "<esc>",                    -- Close diff tab
@@ -157,8 +133,8 @@ require("codediff").setup {
         },
         explorer = {
             select = "o",    -- Open diff for selected file
-        --     hover = "K",        -- Show file diff preview
-        --     refresh = "R",      -- Refresh git status
+            --     hover = "K",        -- Show file diff preview
+            --     refresh = "R",      -- Refresh git status
             toggle_view_mode = "i",  -- Toggle between 'list' and 'tree' views
             toggle_stage = nil,--"s", -- Stage/unstage selected file
             stage_all = nil,--"S",    -- Stage all files
