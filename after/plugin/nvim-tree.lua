@@ -1,5 +1,4 @@
 local api = require "nvim-tree.api"
-vim.keymap.set('n', '<leader>t', api.tree.open) -- open tree and focus
 vim.cmd([[
     augroup NvimTreeAutoFocus
         autocmd BufEnter * lua require'nvim-tree.api'.tree.find_file()
@@ -84,7 +83,6 @@ local function on_attach_nvim_tree(bufnr)
     vim.keymap.set('n', 'g?', api.tree.toggle_help, opts('Help'))
 
     -- add custom
-    vim.keymap.set('n', '<leader>t', '<C-W>l', opts 'Unfocus tree')
 end
 
 local integration = require("integration")
@@ -121,3 +119,61 @@ require("nvim-tree").setup({
         }
     }
 })
+local frappe = require("catppuccin.palettes").get_palette("frappe")
+local mocha = require("catppuccin.palettes").get_palette("mocha")
+require("codediff").setup {
+      --         highlights = {
+      --   -- Line-level: accepts highlight group names or hex colors (e.g., "#2ea043")
+      --   line_insert = mocha.green,      -- Line-level insertions
+      --   line_delete = "DiffDelete",   -- Line-level deletions
+      --
+      --   -- Character-level: accepts highlight group names or hex colors
+      --   -- If specified, these override char_brightness calculation
+      --   char_insert = mocha.yellow,            -- Character-level insertions (nil = auto-derive)
+      --   char_delete = nil,            -- Character-level deletions (nil = auto-derive)
+      --
+      --   -- Brightness multiplier (only used when char_insert/char_delete are nil)
+      --   -- nil = auto-detect based on background (1.4 for dark, 0.92 for light)
+      --   char_brightness = nil,        -- Auto-adjust based on your colorscheme
+      --
+      --   -- Conflict sign highlights (for merge conflict views)
+      --   -- Accepts highlight group names or hex colors (e.g., "#f0883e")
+      --   -- nil = use default fallback chain
+      --   conflict_sign = nil,          -- Unresolved: DiagnosticSignWarn -> #f0883e
+      --   conflict_sign_resolved = nil, -- Resolved: Comment -> #6e7681
+      --   conflict_sign_accepted = nil, -- Accepted: GitSignsAdd -> DiagnosticSignOk -> #3fb950
+      --   conflict_sign_rejected = nil, -- Rejected: GitSignsDelete -> DiagnosticSignError -> #f85149
+      -- },
+    keymaps = {
+        view = {
+            quit = "<esc>",                    -- Close diff tab
+            toggle_explorer = "<leader>T",  -- Toggle explorer visibility (explorer mode only)
+            next_hunk = "]c",   -- Jump to next change
+            prev_hunk = "[c",   -- Jump to previous change
+            next_file = "]f",   -- Next file in explorer mode
+            prev_file = "[f",   -- Previous file in explorer mode
+            -- diff_get = "do",    -- Get change from other buffer (like vimdiff)
+            -- diff_put = "dp",    -- Put change to other buffer (like vimdiff)
+        },
+        explorer = {
+            select = "o",    -- Open diff for selected file
+        --     hover = "K",        -- Show file diff preview
+        --     refresh = "R",      -- Refresh git status
+            toggle_view_mode = "i",  -- Toggle between 'list' and 'tree' views
+            toggle_stage = nil,--"s", -- Stage/unstage selected file
+            stage_all = nil,--"S",    -- Stage all files
+            unstage_all = nil,--"U",  -- Unstage all files
+            restore = nil--"x",      -- Discard changes (restore file)
+        },
+        conflict = {
+            accept_incoming = nil,--j"<leader>ct",  -- Accept incoming (theirs/left) change
+            accept_current = nil,--"<leader>co",   -- Accept current (ours/right) change
+            accept_both = nil,--"<leader>cb",      -- Accept both changes (incoming first)
+            discard = nil,--"<leader>cx",          -- Discard both, keep base
+            next_conflict = "]x",            -- Jump to next conflict
+            prev_conflict = "[x",            -- Jump to previous conflict
+            diffget_incoming = "2do",        -- Get hunk from incoming (left/theirs) buffer
+            diffget_current = "3do",         -- Get hunk from current (right/ours) buffer
+        },
+    },
+}

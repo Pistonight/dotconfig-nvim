@@ -214,6 +214,15 @@ function M.new_floaterm()
     M.switch_to_editview_then(vim.cmd.FloatermNew)
 end
 
+function M.toggle_floaterm()
+    local tt = M.tabtyp()
+    if tt == M.tabt.TERM then
+        vim.cmd.FloatermToggle()
+        return
+    end
+    M.switch_to_editview_then(vim.cmd.FloatermToggle)
+end
+
 function M.cycle_floaterm()
     local tt = M.tabtyp()
     if tt == M.tabt.TERM then
@@ -410,13 +419,15 @@ function M.open_or_accept_aidiff()
         M.switch_to_editview_then(function()
             -- close the aidiff
             vim.cmd(vim.api.nvim_tabpage_get_number(curr_tabpage) .. "tabclose")
-            -- close any dangling aidiff buffers if needed
-            for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-                if M.buftyp(bufnr) == M.buft.AIDIFF then
-                    vim.api.nvim_buf_delete(bufnr, {force=false})
+            M.switch_to_editview_then(function()
+                -- close any dangling aidiff buffers if needed
+                for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+                    if M.buftyp(bufnr) == M.buft.AIDIFF then
+                        vim.api.nvim_buf_delete(bufnr, {force=false})
+                    end
                 end
-            end
-            M.warn("accepted aidiff")
+                M.warn("accepted aidiff")
+            end)
         end)
     end
     local tabpages = M.query_tabpages()
@@ -435,20 +446,22 @@ function M.deny_aidiff()
     -- without checking
     local curr_tabpage = vim.api.nvim_get_current_tabpage()
     local is_in_aidiff = M.tabtyp() == M.tabt.AIDIFF
+    vim.cmd.ClaudeCodeDiffDeny()
     M.switch_to_editview_then(function()
-        vim.cmd.ClaudeCodeDiffDeny()
         vim.cmd(vim.api.nvim_tabpage_get_number(curr_tabpage) .. "tabclose")
-        -- force close the diff buffers
-        for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-            if M.buftyp(bufnr) == M.buft.AIDIFF then
-                vim.api.nvim_buf_delete(bufnr, {force=true})
+        M.switch_to_editview_then(function()
+            -- force close the diff buffers
+            for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+                if M.buftyp(bufnr) == M.buft.AIDIFF then
+                    vim.api.nvim_buf_delete(bufnr, {force=true})
+                end
             end
-        end
-        if is_in_aidiff then
-            -- probably want to tell AI what to do differently
-            vim.cmd.ClaudeCodeFocus()
-        end
-        M.warn("denied aidiff")
+            if is_in_aidiff then
+                -- probably want to tell AI what to do differently
+                vim.cmd.ClaudeCodeFocus()
+            end
+            M.warn("denied aidiff")
+        end)
     end)
 end
 
@@ -496,20 +509,23 @@ function M.open_git_diff(diff_type)
         git_diff_type = diff_type
         if diff_type == "status" then
             vim.cmd.CodeDiff()
-            return
-        end
-        -- otherwise it could be:
-        -- A..B: diff from commit A to commit B
-        -- A: (just the commit/branch name)
-        if diff_type:find("%.%.") then
-            local a, b = diff_type:match("(.+)%.%.(.+)")
-            if a and b then
-                vim.cmd("CodeDiff " .. a .. " " .. b)
-            end
         else
-            vim.cmd("CodeDiff " .. diff_type)
+            -- otherwise it could be:
+            -- A..B: diff from commit A to commit B
+            -- A: (just the commit/branch name)
+            if diff_type:find("%.%.") then
+                local a, b = diff_type:match("(.+)%.%.(.+)")
+                if a and b then
+                    vim.cmd("CodeDiff " .. a .. " " .. b)
+                end
+            else
+                vim.cmd("CodeDiff " .. diff_type)
+            end
         end
-
+        -- -- focus on tree
+        -- vim.defer_fn(function()
+        --     vim.api.nvim_input("<C-w>h<C-w>h")
+        -- end, 200)
     end
     if tabpage_diff ~= nil then
         -- if a different diff is opened, close it
@@ -524,6 +540,22 @@ function M.open_git_diff(diff_type)
     end
     -- no diff opened, just open new one
     M.switch_to_editview_then(do_open)
+end
+
+function M.open_file_tree()
+    local tt = M.tabtyp()
+    if tt == M.tabt.EDIT then
+        vim.cmd.NvimTreeOpen()
+        return
+    end
+    if tt == M.tabt.DIFF then
+        vim.api.nvim_input("<C-w>h<C-w>h")
+        vim.defer_fn(function()
+            if M.buftyp() ~= M.buft.DIFFTREE then
+                vim.api.nvim_input("<leader>T<C-w>h")
+            end
+        end, 30)
+    end
 end
 
 return M

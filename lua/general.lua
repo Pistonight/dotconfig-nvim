@@ -120,10 +120,8 @@ local _ = (function()
     -- toggle undotree
     noremap('n', '<leader>u', vim.cmd.UndotreeToggle)
 
-    -- toggle floaterm
-    noremap('n', [[<C-\>]], vim.cmd.FloatermToggle)
-    noremap('t', [[<C-\>]], vim.cmd.FloatermToggle)
-    -- (inside floaterm only) new floaterm
+    -- floaterm
+    noremap({'n', 't'}, [[<C-\>]], editorapi.toggle_floaterm)
     noremap({'t', 'n'}, [[<leader><C-\>]], editorapi.new_floaterm)
     -- escape from terminal
     noremap('n', '<esc>', editorapi.close_fileterm)
@@ -174,6 +172,10 @@ local _ = (function()
             end
         end)
     end)
+
+    -- focus on tree (edit mode and diff mode)
+    noremap('n', '<leader>t', editorapi.open_file_tree)
+
 
     -- Other key mappings that requires plugin to be loaded first
     -- telescope.lua
