@@ -26,6 +26,7 @@ return require("packer").startup(function(use)
     -- codediff dependency
     use { 'MunifTanjim/nui.nvim',                    commit = "de740991c12411b663994b2860f1a4fd0937c130" }
 
+    -- ## LANGUAGE SERVICE
     use { 'neovim/nvim-lspconfig',                   commit = "d696e36d5792daf828f8c8e8d4b9aa90c1a10c2a" }
     use { 'felpafel/inlay-hint.nvim',                commit = "ee8aa9806d1e160a2bc08b78ae60568fb6d9dbce" }
     use { 'mason-org/mason.nvim',                    commit = "57e5a8addb8c71fb063ee4acda466c7cf6ad2800", run = ":MasonUpdate" }
@@ -42,4 +43,7 @@ return require("packer").startup(function(use)
         ft = { 'java' },
         config = function () require('lsp-wrapper.jdtls') end
     }
+
+    -- ## AI
+    -- note claudecode is installed and patched separately
 end)
