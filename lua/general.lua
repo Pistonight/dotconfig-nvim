@@ -132,8 +132,21 @@ local _ = (function()
     -- auto startinsert when entering non-floaterm
     vim.api.nvim_create_autocmd("BufEnter", {
         callback = function()
-            if editorapi.buftyp() == editorapi.buft.FILETERM then
+            local bt = editorapi.buftyp()
+            if bt == editorapi.buft.FILETERM then
                 vim.cmd("startinsert")
+            elseif bt == editorapi.buft.AIDIFF then
+                local current_buf = vim.api.nvim_get_current_buf()
+                for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+                    local bufnr = vim.api.nvim_win_get_buf(winid)
+                    if bufnr ~= current_buf then
+                        local ft = vim.bo[bufnr].filetype
+                        if ft and ft ~= "" then
+                            vim.bo[current_buf].filetype = ft
+                            break
+                        end
+                    end
+                end
             end
         end
     })

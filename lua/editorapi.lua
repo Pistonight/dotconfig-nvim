@@ -96,7 +96,7 @@ function M.viewtyp(bufnr, tabpage)
     if string.find(filetype, "Telescope") then
         return M.tabt.SEARCH, M.buft.SEARCH
     end
-    if vim.api.nvim_buf_get_name(bufnr or 0):match("claude[/\\]proposed$") ~= nil
+    if vim.api.nvim_buf_get_name(bufnr or 0):match("%.claude%-proposed$") ~= nil
     then
         return M.tabt.AIDIFF, M.buft.AIDIFF
     end
@@ -104,7 +104,7 @@ function M.viewtyp(bufnr, tabpage)
     for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(tabpage or 0)) do
         local b = vim.api.nvim_win_get_buf(winid)
         local b_name = vim.api.nvim_buf_get_name(b)
-        if b_name:match("claude[/\\]proposed$") ~= nil then
+        if b_name:match("%.claude%-proposed$") ~= nil then
             -- self is not AIDIFF, but AIDIFF tab open,
             -- self must be AIFILE
             return M.tabt.AIDIFF, M.buft.AIFILE
@@ -151,6 +151,16 @@ function M.query_tabpages()
         end
     end
     return out
+end
+
+---Check if currently focused on aicoder (in the right buffer and terminal mode)
+function M.is_aicoder_focused()
+    if vim.api.nvim_get_mode().mode == "t" then
+        if M.buftyp() == M.buft.FILETERM then
+            return true
+        end
+    end
+    return false
 end
 
 ---Switch to tab based on type, execute the callback if succeeded
@@ -397,6 +407,8 @@ function M.close_aicoder()
     end
 end
 
+M.was_aicoder_focused_when_aidiff_open = false
+
 ---If not looking at AIDiff, open it
 ---Otherwise accept it
 function M.open_or_accept_aidiff()
@@ -426,10 +438,15 @@ function M.open_or_accept_aidiff()
                         vim.api.nvim_buf_delete(bufnr, {force=false})
                     end
                 end
+                if M.was_aicoder_focused_when_aidiff_open then
+                    -- return the focus
+                    vim.cmd.ClaudeCodeFocus()
+                end
                 M.warn("accepted aidiff")
             end)
         end)
     end
+    M.was_aicoder_focused_when_aidiff_open = M.is_aicoder_focused()
     local tabpages = M.query_tabpages()
     local tabpage_aidiff = tabpages[M.tabt.AIDIFF]
     if tabpage_aidiff == nil then
