@@ -1,5 +1,5 @@
 diff --git a/lua/claudecode/diff.lua b/lua/claudecode/diff.lua
-index 7e1b8f0..a19863c 100644
+index 7e1b8f0..904d937 100644
 --- a/lua/claudecode/diff.lua
 +++ b/lua/claudecode/diff.lua
 @@ -549,15 +549,128 @@ local function load_original_buffer(original_win, old_file_path, is_new_file, ex
@@ -47,10 +47,10 @@ index 7e1b8f0..a19863c 100644
 +  -- Calculate dimensions: 30 characters wide, 8 lines tall
 +  local screen_height = vim.o.lines
 +  local win_width = 28
-+  local win_height = 8
++  local win_height = 4
 +
 +  -- Position at bottom left, 1 line from the bottom
-+  local row = screen_height - win_height - 1
++  local row = screen_height - win_height - 3
 +  local col = 0
 +
 +  -- Create buffer for the notification
@@ -140,7 +140,7 @@ index 7e1b8f0..a19863c 100644
  local function setup_new_buffer(
    original_win,
    original_buf,
-@@ -567,68 +680,64 @@ local function setup_new_buffer(
+@@ -567,68 +680,62 @@ local function setup_new_buffer(
    terminal_win_in_new_tab,
    target_win_for_meta
  )
@@ -165,12 +165,16 @@ index 7e1b8f0..a19863c 100644
 -  vim.cmd("wincmd =")
  
 -  vim.api.nvim_set_current_win(new_win)
-+  -- Fixed path for proposed file (no extension)
-+  local proposed_path = dir .. "/proposed"
- 
+-
 -  vim.b[new_buf].claudecode_diff_tab_name = tab_name
 -  vim.b[new_buf].claudecode_diff_new_win = new_win
 -  vim.b[new_buf].claudecode_diff_target_win = target_win_for_meta
++  -- Compute proposed file path based on original file path
++  -- Replace path separators and other problematic characters to avoid nested directories
++  local sanitized_name = old_file_path:gsub("[/\\:*?\"<>|]", "_")
++  local timestamp = os.time()
++  local proposed_path = dir .. sanitized_name .. "_" .. timestamp .. ".claude-proposed"
++
 +  -- Get proposed content from buffer
 +  local new_lines = vim.api.nvim_buf_get_lines(new_buf, 0, -1, false)
 +  local new_content = table.concat(new_lines, "\n")
@@ -232,32 +236,27 @@ index 7e1b8f0..a19863c 100644
 +    old_file_path = old_file_path,
 +  }
 +
-+    local is_in_claude = false
-+    if vim.api.nvim_get_mode().mode == "t" then
-+        local editorapi = require("editorapi")
-+        if editorapi.buftyp() == editorapi.buft.FILETERM then
-+            is_in_claude = true
-+        end
++    local editorapi = require("editorapi")
++    if editorapi.is_aicoder_focused() then
++        -- open diff
++        editorapi.was_aicoder_focused_when_aidiff_open = true
++        vim.defer_fn(M.open_code_diff, 200)
++        M.dismiss_notification()
++    else
++        editorapi.was_aicoder_focused_when_aidiff_open = false
++        -- Show notification about the new diff
++        show_notification("aidiff available! <leader>bo to view")
      end
 -  end
  
 -  return new_win
-+    if is_in_claude then
-+        -- open diff
-+        vim.defer_fn(M.open_code_diff, 200)
-+        M.dismiss_notification()
-+    else
-+        -- Show notification about the new diff
-+        show_notification("Claude diff available! <leader>bo to view")
-+    end
-+
 +  logger.debug("diff", "Saved diff files to " .. dir .. " for tab: " .. tab_name)
 +
 +  return true, nil
  end
  
  ---Open diff using native Neovim functionality
-@@ -702,6 +811,29 @@ end
+@@ -702,6 +809,29 @@ end
  ---@type table<string, table>
  local active_diffs = {}
  
@@ -287,7 +286,7 @@ index 7e1b8f0..a19863c 100644
  ---Register diff state for tracking
  ---@param tab_name string Unique identifier for the diff
  ---@param diff_data table Diff state data
-@@ -710,26 +842,37 @@ function M._register_diff_state(tab_name, diff_data)
+@@ -710,26 +840,37 @@ function M._register_diff_state(tab_name, diff_data)
  end
  
  ---Resolve diff as saved (user accepted changes)
@@ -333,7 +332,7 @@ index 7e1b8f0..a19863c 100644
    -- Create MCP-compliant response
    local result = {
      content = {
-@@ -805,6 +948,9 @@ function M._resolve_diff_as_rejected(tab_name)
+@@ -805,6 +946,9 @@ function M._resolve_diff_as_rejected(tab_name)
      return
    end
  
@@ -343,7 +342,7 @@ index 7e1b8f0..a19863c 100644
    -- Create MCP-compliant response
    local result = {
      content = {
-@@ -839,45 +985,45 @@ end
+@@ -839,45 +983,45 @@ end
  local function register_diff_autocmds(tab_name, new_buffer)
    local autocmd_ids = {}
  
@@ -425,7 +424,7 @@ index 7e1b8f0..a19863c 100644
  
    -- Note: We intentionally do NOT monitor old_buffer for deletion
    -- because it's the actual file buffer and shouldn't trigger diff rejection
-@@ -892,7 +1038,7 @@ end
+@@ -892,7 +1036,7 @@ end
  ---@param tab_name string The diff identifier
  ---@param is_new_file boolean Whether this is a new file (doesn't exist yet)
  ---@param terminal_win_in_new_tab NvimWin|nil Terminal window in new tab if created
@@ -434,7 +433,7 @@ index 7e1b8f0..a19863c 100644
  ---@return DiffLayoutInfo layout Info about the created diff layout
  function M._create_diff_view_from_window(
    target_window,
-@@ -903,73 +1049,35 @@ function M._create_diff_view_from_window(
+@@ -903,73 +1047,35 @@ function M._create_diff_view_from_window(
    terminal_win_in_new_tab,
    existing_buffer
  )
@@ -531,7 +530,7 @@ index 7e1b8f0..a19863c 100644
    }
  end
  
-@@ -1400,33 +1508,41 @@ function M.reload_file_buffers_manual(file_path, original_cursor_pos)
+@@ -1400,33 +1506,49 @@ function M.reload_file_buffers_manual(file_path, original_cursor_pos)
    return reload_file_buffers(file_path, original_cursor_pos)
  end
  
@@ -563,7 +562,11 @@ index 7e1b8f0..a19863c 100644
  
 -  M._resolve_diff_as_saved(tab_name, current_buffer)
 +  M._resolve_diff_as_saved(latest_diff.tab_name)
-+    latest_diff = nil
++  -- Delete the proposed file if it still exists
++  if latest_diff.proposed_path then
++    os.remove(latest_diff.proposed_path)
++  end
++  latest_diff = nil
  end
  
  ---Deny/reject the current diff (user command version)
@@ -583,7 +586,11 @@ index 7e1b8f0..a19863c 100644
 -  -- Do not close windows/tabs here; just mark as rejected.
 +  local tab_name = latest_diff.tab_name
    M._resolve_diff_as_rejected(tab_name)
-+    latest_diff = nil
++  -- Delete the proposed file if it still exists
++  if latest_diff.proposed_path then
++    os.remove(latest_diff.proposed_path)
++  end
++  latest_diff = nil
  end
  
  return M

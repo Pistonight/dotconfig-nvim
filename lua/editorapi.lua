@@ -408,12 +408,14 @@ function M.close_aicoder()
 end
 
 M.was_aicoder_focused_when_aidiff_open = false
+M.just_accepted_aidiff = false
 
 ---If not looking at AIDiff, open it
 ---Otherwise accept it
 function M.open_or_accept_aidiff()
     local tt = M.tabtyp()
     if tt == M.tabt.AIDIFF then
+        local should_focus = M.was_aicoder_focused_when_aidiff_open
         -- already looking at diff, accept it
         -- make sure no unsaved modifications in all opened windows
         for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
@@ -427,6 +429,7 @@ function M.open_or_accept_aidiff()
             end
         end
         local curr_tabpage = vim.api.nvim_get_current_tabpage()
+        M.just_accepted_aidiff = true
         vim.cmd.ClaudeCodeDiffAccept()
         M.switch_to_editview_then(function()
             -- close the aidiff
@@ -438,9 +441,13 @@ function M.open_or_accept_aidiff()
                         vim.api.nvim_buf_delete(bufnr, {force=false})
                     end
                 end
-                if M.was_aicoder_focused_when_aidiff_open then
-                    -- return the focus
-                    vim.cmd.ClaudeCodeFocus()
+                if should_focus then
+                    vim.defer_fn(function()
+                        if M.tabtyp() == M.tabt.EDIT then
+                            vim.cmd.ClaudeCodeFocus()
+                        end
+                        M.just_accepted_aidiff = false
+                    end, 500)
                 end
                 M.warn("accepted aidiff")
             end)
