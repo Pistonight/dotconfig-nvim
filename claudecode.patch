@@ -1,5 +1,5 @@
 diff --git a/lua/claudecode/diff.lua b/lua/claudecode/diff.lua
-index 7e1b8f0..904d937 100644
+index 7e1b8f0..087768d 100644
 --- a/lua/claudecode/diff.lua
 +++ b/lua/claudecode/diff.lua
 @@ -549,15 +549,128 @@ local function load_original_buffer(original_win, old_file_path, is_new_file, ex
@@ -237,7 +237,7 @@ index 7e1b8f0..904d937 100644
 +  }
 +
 +    local editorapi = require("editorapi")
-+    if editorapi.is_aicoder_focused() then
++    if editorapi.is_aicoder_focused() or editorapi.just_accepted_aidiff then
 +        -- open diff
 +        editorapi.was_aicoder_focused_when_aidiff_open = true
 +        vim.defer_fn(M.open_code_diff, 200)
@@ -245,7 +245,7 @@ index 7e1b8f0..904d937 100644
 +    else
 +        editorapi.was_aicoder_focused_when_aidiff_open = false
 +        -- Show notification about the new diff
-+        show_notification("aidiff available! <leader>bo to view")
++        show_notification("aidiff available! <leader>bv to view")
      end
 -  end
  
