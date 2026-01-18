@@ -102,8 +102,6 @@ local _ = (function()
     noremap('n', '<C-w>-', '<C-w>10-')
     -- copy to system clipboard (see extra.lua)
     noremap('v', '<leader>y', '"ay')
-    -- swap left and right buffers
-    noremap('n', '<leader>w', editorapi.editview_swap_files)
     -- convert between Rust /// doc and JS /** doc */
     noremap('n', '<leader>J', '0f/wBR/**<esc>A */<esc>')
     noremap('v', '<leader>J', '<esc>\'<lt>O<esc>0C/**<esc>\'>o<esc>0C */<esc><cmd>\'<lt>,\'>s/\\/\\/\\// */<cr>gv`<lt>koj=<cmd>nohl<cr>')
@@ -121,8 +119,8 @@ local _ = (function()
     noremap('n', '<leader>u', vim.cmd.UndotreeToggle)
 
     -- floaterm
-    noremap({'n', 't'}, [[<C-\>]], editorapi.toggle_floaterm)
-    noremap({'t', 'n'}, [[<leader><C-\>]], editorapi.new_floaterm)
+    noremap({'n', 't'}, [[<C-\>]], editorapi.editview_floaterm_toggle)
+    noremap({'n', 't'}, [[<leader><C-\>]], editorapi.editview_floaterm_new)
     -- escape from terminal
     noremap('n', '<esc>', editorapi.close_fileterm)
     noremap('t', '<C-w>', editorapi.fileterm_ctrl_w)
@@ -150,7 +148,7 @@ local _ = (function()
     --         end
     --     end
     -- })
-    -- duplicate split view to other side
+    noremap('n', '<leader>w', editorapi.editview_swap_files)
     noremap('n', '<leader>dl', function() editorapi.editview_duplicate(true) end)
     noremap('n', '<leader>dh', function() editorapi.editview_duplicate(false) end)
 

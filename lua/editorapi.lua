@@ -76,7 +76,7 @@ function M.query_tabid(tabt)
     for _, tabid2 in ipairs(vim.api.nvim_list_tabpages()) do
         local t = M.query_tabt(tabid2)
         if t ~= M.tabt.INVALID then
-            M.s_tabmp[t] = tabid
+            M.s_tabmp[t] = tabid2
         end
     end
     return M.s_tabmp[tabt]
@@ -124,7 +124,8 @@ function M.query_tabt(tabid)
         if not vim.api.nvim_tabpage_is_valid(tabid) then
             M.s_tabmp[M.s_tabts[tabid]] = nil
             M.s_tabts[tabid] = nil
-            return M.tabt.INVALID
+            -- default to edit
+            return M.tabt.EDIT
         end
     end
     local x = M.s_tabts[tabid]
@@ -144,8 +145,8 @@ function M.calc_tabt(tabid)
         local fast_wint = M.calc_wint_fast(winid)
         if fast_wint ~= M.wint.INVALID then return wint2tabt(fast_wint) end
     end
-    M.warn("failed to compute tabt for "..tabid)
-    return M.tabt.INVALID
+    -- default to edit view (for example, editing single file)
+    return M.tabt.EDIT
 end
 
 function M.calc_wint_fast(winid)
@@ -224,32 +225,55 @@ function M.editview_duplicate(right)
     end
     if windows_len == 2 then
         local curr_winid = vim.api.nvim_get_current_win()
-        if curr_winid ~= windows[1] and curr_winid ~= windows[2] then return end
-
-        -- local bufnr = vim.api.nvim_win_get_buf(curr_winid)
         if curr_winid == windows[1] then
             vim.api.nvim_win_hide(windows[2])
-        else
+        elseif curr_winid == windows[2] then
             vim.api.nvim_win_hide(windows[1])
+        else
+            return
         end
         if right then
             vim.api.nvim_input('<C-w>v<C-W>l')
         else
             vim.api.nvim_input('<C-w>v')
         end
-        --
-        -- local x_1 = vim.api.nvim_win_get_position(windows[1])[2]
-        -- local x_2 = vim.api.nvim_win_get_position(windows[2])[2]
-        -- local target_winid
-        -- if x_1 < x_2 then
-        --     if right then target_winid = windows[2] else target_winid = windows[1] end
-        -- else
-        --     if right then target_winid = windows[1] else target_winid = windows[2] end
-        -- end
-        -- if curr_winid ~= target_winid then
-        --     vim.api.nvim_set_current_win(target_winid)
-        -- end
     end
+end
+
+---If in floaterm, close floaterm
+---Otherwise switch to EDIT and show floaterm
+function M.editview_floaterm_toggle()
+    local wint = M.query_wint()
+    if wint == M.wint.FLOAT then
+        vim.cmd.FloatermToggle()
+        return
+    end
+    local tabid = M.query_tabid(M.tabt.EDIT)
+    if tabid == nil then
+        M.warn("failed to find edit view")
+    end
+    if tabid == vim.api.nvim_get_current_tabpage() then -- if we are on edit view then toggle terminal
+        vim.cmd.FloatermToggle()
+        return
+    end
+    -- switch to edit view and show/focus on terminal
+    vim.api.nvim_set_current_tabpage(tabid)
+    wint = M.query_wint()
+    if wint == M.wint.FLOAT then -- already focused
+        return
+    end
+    for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(tabid)) do
+        wint = M.query_wint(winid)
+        if wint == M.wint.FLOAT then
+            local curr_winid = vim.api.nvim_get_current_win()
+            if curr_winid ~= winid then
+                vim.api.nvim_set_current_win(curr_winid)
+                return
+            end
+        end
+    end
+    -- did not find floaterm, toggle it
+    vim.cmd.FloatermToggle()
 end
 ---Switch to tab based on type, execute the callback if succeeded
 ---return true if switch successful
@@ -272,7 +296,7 @@ end
 
 
 ---Show a new floaterm if already in floaterm
-function M.new_floaterm()
+function M.editview_floaterm_new()
     local tt = M.tabtyp()
     if tt == M.tabt.TERM then
         -- already in floaterm, make a new one
@@ -281,15 +305,6 @@ function M.new_floaterm()
     end
     -- switch to editview then new floaterm
     M.switch_to_editview_then(vim.cmd.FloatermNew)
-end
-
-function M.toggle_floaterm()
-    local tt = M.tabtyp()
-    if tt == M.tabt.TERM then
-        vim.cmd.FloatermToggle()
-        return
-    end
-    M.switch_to_editview_then(vim.cmd.FloatermToggle)
 end
 
 function M.cycle_floaterm()
