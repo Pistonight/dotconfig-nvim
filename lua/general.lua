@@ -103,7 +103,7 @@ local _ = (function()
     -- copy to system clipboard (see extra.lua)
     noremap('v', '<leader>y', '"ay')
     -- swap left and right buffers
-    noremap('n', '<leader>w', editorapi.swap_editing_files)
+    noremap('n', '<leader>w', editorapi.editview_swap_files)
     -- convert between Rust /// doc and JS /** doc */
     noremap('n', '<leader>J', '0f/wBR/**<esc>A */<esc>')
     noremap('v', '<leader>J', '<esc>\'<lt>O<esc>0C/**<esc>\'>o<esc>0C */<esc><cmd>\'<lt>,\'>s/\\/\\/\\// */<cr>gv`<lt>koj=<cmd>nohl<cr>')
@@ -130,26 +130,26 @@ local _ = (function()
     noremap('t', '<C-n>', editorapi.cycle_floaterm)
     noremap('n', '<C-n>', editorapi.cycle_floaterm)
     -- auto startinsert when entering non-floaterm
-    vim.api.nvim_create_autocmd("BufEnter", {
-        callback = function()
-            local bt = editorapi.buftyp()
-            if bt == editorapi.buft.FILETERM then
-                vim.cmd("startinsert")
-            elseif bt == editorapi.buft.AIDIFF then
-                local current_buf = vim.api.nvim_get_current_buf()
-                for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-                    local bufnr = vim.api.nvim_win_get_buf(winid)
-                    if bufnr ~= current_buf then
-                        local ft = vim.bo[bufnr].filetype
-                        if ft and ft ~= "" then
-                            vim.bo[current_buf].filetype = ft
-                            break
-                        end
-                    end
-                end
-            end
-        end
-    })
+    -- vim.api.nvim_create_autocmd("BufEnter", {
+    --     callback = function()
+    --         local bt = editorapi.buftyp()
+    --         if bt == editorapi.buft.FILETERM then
+    --             vim.cmd("startinsert")
+    --         elseif bt == editorapi.buft.AIDIFF then
+    --             local current_buf = vim.api.nvim_get_current_buf()
+    --             for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    --                 local bufnr = vim.api.nvim_win_get_buf(winid)
+    --                 if bufnr ~= current_buf then
+    --                     local ft = vim.bo[bufnr].filetype
+    --                     if ft and ft ~= "" then
+    --                         vim.bo[current_buf].filetype = ft
+    --                         break
+    --                     end
+    --                 end
+    --             end
+    --         end
+    --     end
+    -- })
     -- duplicate split view to other side
     noremap('n', '<leader>dl', function() editorapi.editview_duplicate(true) end)
     noremap('n', '<leader>dh', function() editorapi.editview_duplicate(false) end)
