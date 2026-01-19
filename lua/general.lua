@@ -40,11 +40,6 @@ vim.opt.incsearch = true -- should be the default
 -- scrolling
 vim.opt.scrolloff = 8
 vim.opt.sidescrolloff = 8
--- diff
-vim.cmd([[
-:set diffopt+=internal,algorithm:patience,indent-heuristic
-:set diffopt+=linematch:60
-]])
 
 -- Floaterm style
 vim.g.floaterm_title = 'Terminal [$1/$2]'
@@ -121,12 +116,9 @@ local _ = (function()
     -- floaterm
     noremap({'n', 't'}, [[<C-\>]], editorapi.editview_floaterm_toggle)
     noremap({'n', 't'}, [[<leader><C-\>]], editorapi.editview_floaterm_new)
-    -- escape from terminal
-    noremap('n', '<esc>', editorapi.close_fileterm)
-    noremap('t', '<C-w>', editorapi.fileterm_ctrl_w)
+    noremap({'n', 't'}, '<C-n>', editorapi.editview_floaterm_cycle)
+    noremap('t', '<C-w>', editorapi.editview_terminal_escape)
     -- cycle through terminals when floaterm is open
-    noremap('t', '<C-n>', editorapi.cycle_floaterm)
-    noremap('n', '<C-n>', editorapi.cycle_floaterm)
     -- auto startinsert when entering non-floaterm
     -- vim.api.nvim_create_autocmd("BufEnter", {
     --     callback = function()

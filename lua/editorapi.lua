@@ -39,6 +39,8 @@ local function enumname(value)
     return tostring(value)
 end
 
+-- AUTOCOMMANDS
+
 -- STATES
 -- making editorapi stateful for better performance. for example,
 -- avoids recomputing window types and tabpage types
@@ -61,6 +63,38 @@ function M.print_state()
     end
     local msg = "s_tabts=" .. vim.inspect(tabts_str) .. "\ns_tabmp="..vim.inspect(tabmp_str).."\ns_wints="..vim.inspect(wints_str)
     vim.api.nvim_echo({{ msg, "Normal" }}, true, {})
+end
+
+local wints_ops = 0
+function M.clean_state(force)
+    if wints_ops < 100 and not force then
+        return
+    end
+    wints_ops = 0
+    local to_remove = {}
+    for tabid, _ in pairs(M.s_tabts) do
+        if not vim.api.nvim_tabpage_is_valid(tabid) then
+            table.insert(to_remove, tabid)
+        end
+    end
+    for _, tabid in ipairs(to_remove) do
+        M.s_tabts[tabid] = nil
+    end
+    if #to_remove > 0 then
+        M.s_tabmp = {}
+        for tabid, tabt in pairs(M.s_tabts) do
+            M.s_tabmp[tabt] = tabid
+        end
+    end
+    to_remove = {}
+    for winid, _ in pairs(M.s_wints) do
+        if not vim.api.nvim_win_is_valid(winid) then
+            table.insert(to_remove, winid)
+        end
+    end
+    for _, winid in ipairs(to_remove) do
+        M.s_wints[winid] = nil
+    end
 end
 
 ---Get the tabpage id if exists, or nil
@@ -99,6 +133,8 @@ function M.query_wint(winid)
     end
     w = M.calc_wint(winid)
     M.s_wints[winid] = w
+    wints_ops = wints_ops + 1
+    M.clean_state(false)
     return w
 end
 
@@ -187,19 +223,20 @@ end
 function M.editview_swap_files()
     local tabt = M.query_tabt()
     if tabt ~= M.tabt.EDIT then return end
+    if vim.bo.buftype == "terminal" then return end -- faster query
 
-    local windows = M.editview_query_file_windows()
-    if #windows ~= 2 then return end
+    local filewins, _ = M.editview_query_file_windows()
+    if #filewins ~= 2 then return end
 
     local curr_winid = vim.api.nvim_get_current_win()
-    local bufnr1 = vim.api.nvim_win_get_buf(windows[1])
-    local bufnr2 = vim.api.nvim_win_get_buf(windows[2])
-    vim.api.nvim_win_set_buf(windows[1], bufnr2)
-    vim.api.nvim_win_set_buf(windows[2], bufnr1)
-    if curr_winid == windows[1] then
-        vim.api.nvim_set_current_win(windows[2])
-    elseif curr_winid == windows[2] then
-        vim.api.nvim_set_current_win(windows[1])
+    local bufnr1 = vim.api.nvim_win_get_buf(filewins[1])
+    local bufnr2 = vim.api.nvim_win_get_buf(filewins[2])
+    vim.api.nvim_win_set_buf(filewins[1], bufnr2)
+    vim.api.nvim_win_set_buf(filewins[2], bufnr1)
+    if curr_winid == filewins[1] then
+        vim.api.nvim_set_current_win(filewins[2])
+    elseif curr_winid == filewins[2] then
+        vim.api.nvim_set_current_win(filewins[1])
     end
 end
 
@@ -208,35 +245,31 @@ end
 function M.editview_duplicate(right)
     local tabt = M.query_tabt()
     if tabt ~= M.tabt.EDIT then return end
+    if vim.bo.buftype == "terminal" then return end -- faster query
 
-    local windows = M.editview_query_file_windows()
-    local windows_len = #windows
+    local filewins, termwins = M.editview_query_file_windows()
+    for _, winid in ipairs(termwins) do
+        vim.api.nvim_win_hide(winid)
+    end
+    local windows_len = #filewins
     if windows_len == 1 then
         local curr_winid = vim.api.nvim_get_current_win()
-        if curr_winid ~= windows[1] then
-            vim.api.nvim_set_current_win(windows[1])
+        if curr_winid ~= filewins[1] then
+            vim.api.nvim_set_current_win(filewins[1])
         end
-        if right then
-            vim.api.nvim_input('<C-w>v<C-W>l')
-        else
-            vim.api.nvim_input('<C-w>v')
-        end
+        if right then vim.api.nvim_input('<C-w>v<C-W>l') else vim.api.nvim_input('<C-w>v') end
         return
     end
     if windows_len == 2 then
         local curr_winid = vim.api.nvim_get_current_win()
-        if curr_winid == windows[1] then
-            vim.api.nvim_win_hide(windows[2])
-        elseif curr_winid == windows[2] then
-            vim.api.nvim_win_hide(windows[1])
+        if curr_winid == filewins[1] then
+            vim.api.nvim_win_hide(filewins[2])
+        elseif curr_winid == filewins[2] then
+            vim.api.nvim_win_hide(filewins[1])
         else
             return
         end
-        if right then
-            vim.api.nvim_input('<C-w>v<C-W>l')
-        else
-            vim.api.nvim_input('<C-w>v')
-        end
+        if right then vim.api.nvim_input('<C-w>v<C-W>l') else vim.api.nvim_input('<C-w>v') end
     end
 end
 
@@ -249,9 +282,6 @@ function M.editview_floaterm_toggle()
         return
     end
     local tabid = M.query_tabid(M.tabt.EDIT)
-    if tabid == nil then
-        M.warn("failed to find edit view")
-    end
     if tabid == vim.api.nvim_get_current_tabpage() then -- if we are on edit view then toggle terminal
         vim.cmd.FloatermToggle()
         return
@@ -275,6 +305,39 @@ function M.editview_floaterm_toggle()
     -- did not find floaterm, toggle it
     vim.cmd.FloatermToggle()
 end
+
+
+---If in floaterm, make a new terminal instance
+function M.editview_floaterm_new()
+    local wint = M.query_wint()
+    if wint == M.wint.FLOAT then
+        vim.cmd.FloatermNew()
+    end
+end
+
+---If in floaterm, cycle between the terminals
+function M.editview_floaterm_cycle()
+    local wint = M.query_wint()
+    if wint == M.wint.FLOAT then
+        vim.cmd.FloatermNext()
+    end
+end
+
+---Action to escape active terminal
+---If in NTERM, it will ready to switch focus
+---If in FLOAT, it will switch to normal mode
+function M.editview_terminal_escape()
+    local wint = M.query_wint()
+    if wint == M.wint.FLOAT then
+        vim.cmd("stopinsert")
+        return
+    end
+    if wint == M.wint.NTERM then
+        vim.cmd("stopinsert")
+        -- also execute another C-w to be ready to switch focus
+        vim.api.nvim_input("<C-w>")
+    end
+end
 ---Switch to tab based on type, execute the callback if succeeded
 ---return true if switch successful
 function M.switch_tab_then(tab_type, cb)
@@ -292,40 +355,6 @@ function M.switch_tab_then(tab_type, cb)
         if cb then vim.defer_fn(cb, 30) end
     end
     return true
-end
-
-
----Show a new floaterm if already in floaterm
-function M.editview_floaterm_new()
-    local tt = M.tabtyp()
-    if tt == M.tabt.TERM then
-        -- already in floaterm, make a new one
-        vim.cmd.FloatermNew()
-        return
-    end
-    -- switch to editview then new floaterm
-    M.switch_to_editview_then(vim.cmd.FloatermNew)
-end
-
-function M.cycle_floaterm()
-    local tt = M.tabtyp()
-    if tt == M.tabt.TERM then
-        vim.cmd.FloatermNext()
-    end
-end
-
-function M.close_fileterm()
-    if M.buftyp() == M.buft.FILETERM then
-        vim.cmd("close")-- close the file terminal
-    end
-end
-
-function M.fileterm_ctrl_w()
-    vim.cmd("stopinsert") -- to normal mode
-    if M.buftyp() == M.buft.FILETERM then
-        -- also execute another C-w to be ready to switch focus
-        vim.api.nvim_input("<C-w>")
-    end
 end
 
 --- (Only available in EDIT tab) Focus the window that's on (close the other), then call CB
@@ -429,14 +458,17 @@ local aicoder_started = false
 ---List NFILE window ids in the edit view
 ---@param tabid integer | nil, the EDIT tabid, 0 to use current tab
 function M.editview_query_file_windows(tabid)
-    local windows = {}
+    local files = {}
+    local terms = {}
     for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(tabid or 0)) do
         local wint = M.query_wint(winid)
         if wint == M.wint.NFILE then
-            table.insert(windows, winid)
+            table.insert(files, winid)
+        elseif wint == M.wint.NTERM then
+            table.insert(terms, winid)
         end
     end
-    return windows
+    return files, terms
 end
 
 ---Switch to EDIT and open AI Coder
