@@ -13,6 +13,7 @@ import argparse
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 # Constants
@@ -38,11 +39,22 @@ def run_git(*args: str, cwd: Path | None = None, check: bool = True) -> subproce
     return subprocess.run(cmd, cwd=cwd, check=check, capture_output=True, text=True)
 
 
+def remove_local_repo() -> None:
+    """Remove the local repo directory with retry logic."""
+    if not LOCAL_REPO_PATH.exists():
+        return
+    try:
+        shutil.rmtree(LOCAL_REPO_PATH)
+    except OSError:
+        print(f"ERROR: Failed to remove {LOCAL_REPO_PATH}, will retry", file=sys.stderr)
+        time.sleep(2)
+        shutil.rmtree(LOCAL_REPO_PATH)
+
+
 def sparse_checkout_repo() -> None:
     """Perform sparse checkout of the repo."""
     LOCAL_REPO_PATH.parent.mkdir(parents=True, exist_ok=True)
-    if LOCAL_REPO_PATH.exists():
-        shutil.rmtree(LOCAL_REPO_PATH)
+    remove_local_repo()
     print(f"Cloning {REPO_URL} (sparse checkout)...")
     LOCAL_REPO_PATH.mkdir(parents=True, exist_ok=True)
     run_git("init", cwd=LOCAL_REPO_PATH)
@@ -155,9 +167,8 @@ def copy_repo_to_local() -> None:
 
 def cleanup() -> None:
     """Remove the temporary repo."""
-    if LOCAL_REPO_PATH.exists():
-        shutil.rmtree(LOCAL_REPO_PATH)
-        print(f"Cleaned up {LOCAL_REPO_PATH}")
+    remove_local_repo()
+    print(f"Cleaned up {LOCAL_REPO_PATH}")
 
 
 def main() -> None:
