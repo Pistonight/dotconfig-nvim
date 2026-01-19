@@ -20,7 +20,7 @@ set shellxquote=
         vim.cmd([[
 augroup YankToScript
   autocmd!
-  autocmd TextYankPost * if v:register == 'a' | call writefile([getreg('a')], $LOCALAPPDATA .. '/.config/nvim/.yank') | silent! execute '!(Get-Content $env:LOCALAPPDATA/.config/nvim/.yank) -replace "`0","`n" | set-clipboard' | redraw! | endif
+  autocmd TextYankPost * if v:register == 'a' | call writefile([getreg('a')], $LOCALAPPDATA .. '/nvim/.yank') | silent! execute '!(Get-Content $env:LOCALAPPDATA/nvim/.yank) -replace "`0","`n" | set-clipboard' | redraw! | endif
 augroup END
         ]])
     elseif vim.fn.executable("wl-copy") ~= 0 then
