@@ -110,58 +110,36 @@ local _ = (function()
     -- toggle comment
     noremap('n', '<leader>c', vim.cmd.CommentToggle)
     noremap('v', '<leader>c', "V<cmd>'<,'>CommentToggle<cr>gv")
+
+    -- view change
     -- toggle undotree
     noremap('n', '<leader>u', vim.cmd.UndotreeToggle)
+    noremap('n', '<leader>w', editorapi.editview_swap_files)
+    noremap('n', '<leader>dl', function() editorapi.editview_duplicate(true) end)
+    noremap('n', '<leader>dh', function() editorapi.editview_duplicate(false) end)
 
     -- floaterm
     noremap({'n', 't'}, [[<C-\>]], editorapi.editview_floaterm_toggle)
     noremap({'n', 't'}, [[<leader><C-\>]], editorapi.editview_floaterm_new)
     noremap({'n', 't'}, '<C-n>', editorapi.editview_floaterm_cycle)
     noremap('t', '<C-w>', editorapi.editview_terminal_escape)
-    -- cycle through terminals when floaterm is open
-    -- auto startinsert when entering non-floaterm
-    -- vim.api.nvim_create_autocmd("BufEnter", {
-    --     callback = function()
-    --         local bt = editorapi.buftyp()
-    --         if bt == editorapi.buft.FILETERM then
-    --             vim.cmd("startinsert")
-    --         elseif bt == editorapi.buft.AIDIFF then
-    --             local current_buf = vim.api.nvim_get_current_buf()
-    --             for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-    --                 local bufnr = vim.api.nvim_win_get_buf(winid)
-    --                 if bufnr ~= current_buf then
-    --                     local ft = vim.bo[bufnr].filetype
-    --                     if ft and ft ~= "" then
-    --                         vim.bo[current_buf].filetype = ft
-    --                         break
-    --                     end
-    --                 end
-    --             end
-    --         end
-    --     end
-    -- })
-    noremap('n', '<leader>w', editorapi.editview_swap_files)
-    noremap('n', '<leader>dl', function() editorapi.editview_duplicate(true) end)
-    noremap('n', '<leader>dh', function() editorapi.editview_duplicate(false) end)
 
     -- telescopers
-    noremap({'n', 't'}, '<leader>ff', editorapi.open_file_finder)
-    noremap('n', '<leader>fr', editorapi.open_last_finder)
-    noremap('t', '<C-f>r', editorapi.open_last_finder)
-    noremap('n', '<leader>fg', editorapi.open_live_grep_finder)
-    noremap('t', '<C-f>g', editorapi.open_live_grep_finder)
-    noremap('n', '<leader>fb', editorapi.open_buffer_finder)
-    noremap('t', '<C-f>b', editorapi.open_buffer_finder)
-    noremap('n', '<leader>fs', editorapi.open_symbol_finder)
-    noremap('t', '<C-f>s', editorapi.open_symbol_finder)
-    noremap('n', 'gr', editorapi.open_reference_finder)
-    noremap('n', 'gd', editorapi.open_definition_finder)
-    noremap('n', 'gi', editorapi.open_implementation_finder)
-    noremap('n', '<leader>vd', editorapi.open_diagnostic_finder)
-    -- just switch to main edit view
-    noremap('n', '<leader>e', function() editorapi.switch_to_editview_then(nil) end)
-    -- ## AI Coder integration
-    noremap('n', '<leader>bb', editorapi.open_aicoder)
+    noremap({'n', 't'}, '<leader>ff', editorapi.editview_openfinder_file)
+    -- noremap('n', '<leader>fr', editorapi.open_last_finder)
+    -- noremap('t', '<C-f>r', editorapi.open_last_finder)
+    -- noremap('n', '<leader>fg', editorapi.open_live_grep_finder)
+    -- noremap('t', '<C-f>g', editorapi.open_live_grep_finder)
+    -- noremap('n', '<leader>fb', editorapi.open_buffer_finder)
+    -- noremap('t', '<C-f>b', editorapi.open_buffer_finder)
+    -- noremap('n', '<leader>fs', editorapi.open_symbol_finder)
+    -- noremap('t', '<C-f>s', editorapi.open_symbol_finder)
+    -- noremap('n', 'gr', editorapi.open_reference_finder)
+    -- noremap('n', 'gd', editorapi.open_definition_finder)
+    -- noremap('n', 'gi', editorapi.open_implementation_finder)
+    -- noremap('n', '<leader>vd', editorapi.open_diagnostic_finder)
+    -- ai coder
+    noremap('n', '<leader>bb', editorapi.editview_aicoder_open)
     noremap({'n', 't'}, '<leader>bg', editorapi.close_aicoder)
     noremap({'n', 't'}, '<leader>bv', editorapi.open_or_accept_aidiff)
     noremap({'n', 't'}, '<leader>bd', editorapi.deny_aidiff)

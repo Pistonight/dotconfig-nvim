@@ -40,7 +40,31 @@ local function enumname(value)
     return tostring(value)
 end
 
--- AUTOCOMMANDS
+-- AUTOCOMMANDS ========================================================================
+vim.api.nvim_create_autocmd("BufEnter", {
+    callback = function()
+        -- cannot save cache when query, because BufEnter
+        -- can be called very early before NvimTree is setup
+        local wint = M.query_wint(nil, true)
+
+        if wint == M.wint.NTERM then
+            vim.cmd("startinsert")
+        end
+    --         elseif bt == editorapi.buft.AIDIFF then
+    --             local current_buf = vim.api.nvim_get_current_buf()
+    --             for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    --                 local bufnr = vim.api.nvim_win_get_buf(winid)
+    --                 if bufnr ~= current_buf then
+    --                     local ft = vim.bo[bufnr].filetype
+    --                     if ft and ft ~= "" then
+    --                         vim.bo[current_buf].filetype = ft
+    --                         break
+    --                     end
+    --                 end
+    --             end
+    --         end
+    end
+})
 
 -- STATES
 -- making editorapi stateful for better performance. for example,
@@ -126,7 +150,8 @@ end
 
 ---Get the type of a window
 ---@param winid integer | nil window id
-function M.query_wint(winid)
+---@param no_save_cache boolean | nil don't save cache (can use cached value)
+function M.query_wint(winid, no_save_cache)
     if winid == 0 or winid == nil then
         winid = vim.api.nvim_get_current_win()
     else
@@ -136,11 +161,13 @@ function M.query_wint(winid)
         end
     end
     local w = M.s_wints[winid]
-    if w ~= nil then -- previous queried, assume it's still valid
+    if w ~= nil then
         return w
     end
-    w = M.calc_wint(winid)
-    M.s_wints[winid] = w
+    w = M.calc_wint(winid, no_save_cache or false)
+    if not no_save_cache then
+        M.s_wints[winid] = w
+    end
     wints_ops = wints_ops + 1
     M.clean_state(false)
     return w
@@ -148,12 +175,13 @@ end
 
 ---Calculate type of window
 ---@param winid integer valid window id
-function M.calc_wint(winid)
+---@param no_save_cache boolean don't save cache (can use cached value)
+function M.calc_wint(winid, no_save_cache)
     local fast_wint = M.calc_wint_fast(winid)
     if fast_wint ~= M.wint.INVALID then return fast_wint end
 
     local tabid = vim.api.nvim_win_get_tabpage(winid)
-    local tabtype = M.query_tabt(tabid)
+    local tabtype = M.query_tabt(tabid, no_save_cache)
     if tabtype == M.tabt.EDIT then
         return M.wint.NFILE
     end
@@ -163,7 +191,8 @@ end
 
 ---Get the type of a tabpage
 ---@param tabid integer | nil tabpage id
-function M.query_tabt(tabid)
+---@param no_save_cache boolean | nil don't save cache (can use cached value)
+function M.query_tabt(tabid, no_save_cache)
     if tabid == 0 or tabid == nil then
         tabid = vim.api.nvim_get_current_tabpage()
     else
@@ -171,7 +200,7 @@ function M.query_tabt(tabid)
             M.s_tabmp[M.s_tabts[tabid]] = nil
             M.s_tabts[tabid] = nil
             -- default to edit
-            return M.tabt.EDIT
+            return M.tabt.INVALID
         end
     end
     local x = M.s_tabts[tabid]
@@ -179,8 +208,10 @@ function M.query_tabt(tabid)
         return x
     end
     x = M.calc_tabt(tabid)
-    M.s_tabts[tabid] = x
-    M.s_tabmp[x] = tabid
+    if not no_save_cache then
+        M.s_tabts[tabid] = x
+        M.s_tabmp[x] = tabid
+    end
     return x
 end
 
@@ -219,16 +250,6 @@ function M.calc_wint_fast(winid)
     end
 
     return M.wint.INVALID
-end
-
----Check if currently focused on aicoder (in the right buffer and terminal mode)
-function M.is_aicoder_focused()
-    if vim.api.nvim_get_mode().mode == "t" then
-        if M.buftyp() == M.buft.FILETERM then
-            return true
-        end
-    end
-    return false
 end
 
 -- VIEW CHANGE =====================================================================
@@ -312,6 +333,7 @@ function M.editview_duplicate(right)
         vim.api.nvim_win_set_cursor(other_winid, cursor)
         return
     end
+    M.warn("editview_duplicate: too many file windows")
 end
 
 ---If in floaterm, close floaterm
@@ -380,101 +402,53 @@ function M.editview_terminal_escape()
     end
 end
 
-
 -- VIEW CHANGE / Telescope =====================================================================
 
----Switch to tab based on type, execute the callback if succeeded
----return true if switch successful
-function M.switch_tab_then(tab_type, cb)
-    local tabpages = M.query_tabpages()
-    local tabpage = tabpages[tab_type]
-    if tabpage == nil then
-        M.warn("cannot find requested tabpage")
-        return false
-    end
-    local current = vim.api.nvim_get_current_tabpage()
-    if current == tabpage then
-        if cb then cb() end
-    else
-        vim.api.nvim_set_current_tabpage(tabpage)
-        if cb then vim.defer_fn(cb, 30) end
+local telescope_is_opened_from_aicoder = false
+local telescope_attach_file_picker_mappings = function(bufnr, _)
+    if telescope_is_opened_from_aicoder then
+        local actions = require "telescope.actions"
+        local action_state = require "telescope.actions.state"
+        actions.select_default:replace(function()
+            actions.close(bufnr)
+            local selection = action_state.get_selected_entry()
+            vim.cmd("ClaudeCodeAdd " .. selection[1])
+            vim.defer_fn(function()
+                M.editview_aicoder_open()
+            end, 50)
+        end)
     end
     return true
 end
 
---- (Only available in EDIT tab) Focus the window that's on (close the other), then call CB
-function M.editview_focus_then(cb)
-    local tt, bt = M.viewtyp()
-    if tt ~= M.tabt.EDIT or bt == M.buft.FILETERM or bt == M.buft.TREE then
-        M.warn("operation not supported on current window")
-        return
-    end
-    local window = vim.api.nvim_get_current_win();
-    for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-        if winid ~= window then
-            local bufnr = vim.api.nvim_win_get_buf(winid)
-            if M.buftyp(bufnr) ~= M.buft.NOTIF then
-                vim.api.nvim_win_hide(winid)
-            end
-        end
-    end
-    vim.cmd.NvimTreeOpen()
-    vim.api.nvim_input("<C-w>l")
-    vim.defer_fn(cb, 30)
+function M.editview_openfinder_last()
+    local wint = M.query_wint()
+    if wint == M.wint.TELES then return end
+    telescope_is_opened_from_aicoder = wint == M.wint.NTERM
+    M.editview_normalize(false)
+    vim.cmd("Telescope resume")
 end
 
-function M.switch_to_editview_then(cb)
-    M.switch_tab_then(M.tabt.EDIT, function()
-        local bt = M.buftyp()
-        if bt == M.buft.FILETERM then
-            -- switch focus to other view
-            vim.cmd("stopinsert")
-            vim.api.nvim_input("<C-w>h")
-            if cb then vim.defer_fn(cb, 30) end
-            return
-        end
-        if bt == M.buft.FLOATERM then
-            vim.cmd.FloatermToggle()
-            if cb then vim.defer_fn(cb, 30) end
-            return
-        end
-        if cb then cb() end
-    end)
+function M.editview_openfinder_file()
+    local wint = M.query_wint()
+    if wint == M.wint.TELES then return end
+    telescope_is_opened_from_aicoder = wint == M.wint.NTERM
+    M.editview_normalize(false)
+    require('telescope.builtin').find_files {
+        attach_mappings = telescope_attach_file_picker_mappings
+    }
 end
 
-function M.open_file_finder()
-    M.switch_to_editview_then(function()
-        local builtin = require('telescope.builtin')
-        builtin.find_files {
-            attach_mappings = function(bufnr, map)
-                map("i", "<C-l>", function()
-                    local actions = require "telescope.actions"
-                    actions.close(bufnr)
-                    vim.defer_fn(function()
-                        local action_state = require "telescope.actions.state"
-                        local selection = action_state.get_selected_entry()
-                        vim.cmd("ClaudeCodeAdd " .. selection[1])
-                        -- keep focus inside fileterm
-                        vim.api.nvim_input("<C-w>l")
-                    end, 100)
-                end)
-                -- needs to return true to map default_mappings
-                return true
-            end
-        }
-    end)
+function M.editview_openfinder_live_grep()
+    require('telescope.builtin').live_grep {
+        attach_mappings = telescope_attach_file_picker_mappings
+    }
 end
 
-function M.open_last_finder()
-    M.switch_to_editview_then(function() vim.cmd("Telescope resume") end)
-end
-
-function M.open_live_grep_finder()
-    M.switch_to_editview_then(function() require("telescope.builtin").live_grep() end)
-end
-
-function M.open_buffer_finder()
-    M.switch_to_editview_then(function() require("telescope.builtin").buffers() end)
+function M.editview_openfinder_buffer()
+    require('telescope.builtin').buffers {
+        attach_mappings = telescope_attach_file_picker_mappings
+    }
 end
 
 function M.open_definition_finder()
@@ -498,7 +472,85 @@ function M.open_symbol_finder()
     M.switch_to_editview_then(function() require("telescope.builtin").treesitter() end)
 end
 
+-- VIEW CHANGE / AI Coder =====================================================================
+
 local aicoder_started = false
+---Switch to EDIT and open AI Coder
+function M.editview_aicoder_open()
+    if M.query_wint() == M.wint.NTERM then
+        return
+    end
+    if not aicoder_started then
+        vim.cmd.ClaudeCodeStart()
+        aicoder_started = true
+    end
+    M.editview_normalize(false)
+    local tabid = M.query_tabid(M.tabt.EDIT)
+    local filewins, termwins = M.editview_query_file_windows(tabid)
+    if #termwins > 0 then -- just focus on the first
+        vim.api.nvim_set_current_win(termwins[1])
+        return
+    end
+    local filewins_len = #filewins
+    if filewins_len == 0 then -- will mess up the view if open ai coder first
+        M.warn("cannot open aicoder when no file in view")
+        return
+    end
+    local curr_winid = vim.api.nvim_get_current_win()
+    vim.cmd.ClaudeCode() -- open to let it load first
+    if filewins_len == 1 then
+        -- find the ai coder terminal
+        for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(tabid)) do
+            local wint = M.query_wint(winid)
+            if wint == M.wint.NTERM then
+                vim.fn.win_splitmove(curr_winid, winid, { vertical = true })
+                break
+            end
+        end
+        return
+    end
+    if filewins_len == 2 then
+        if curr_winid == filewins[1] then
+            vim.api.nvim_win_hide(filewins[2])
+        elseif curr_winid == filewins[2] then
+            vim.api.nvim_win_hide(filewins[1])
+        else
+            -- close the one on the right
+            local x_1 = vim.api.nvim_win_get_position(filewins[1])[2]
+            local x_2 = vim.api.nvim_win_get_position(filewins[2])[2]
+            if x_1 < x_2 then
+                vim.api.nvim_win_hide(filewins[2])
+                curr_winid = filewins[1]
+            else
+                vim.api.nvim_win_hide(filewins[1])
+                curr_winid = filewins[2]
+            end
+        end
+        -- find the ai coder terminal
+        for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(tabid)) do
+            local wint = M.query_wint(winid)
+            if wint == M.wint.NTERM then
+                vim.fn.win_splitmove(curr_winid, winid, { vertical = true })
+                break
+            end
+        end
+        return
+    end
+    M.warn("editview_open_aicoder: too many file windows")
+end
+
+---Check if currently focused on aicoder (in the right buffer and terminal mode)
+function M.is_aicoder_focused()
+    if vim.api.nvim_get_mode().mode == "t" then
+        if M.buftyp() == M.buft.FILETERM then
+            return true
+        end
+    end
+    return false
+end
+
+-- VIEW CHANGE / Helpers =====================================================================
+
 
 ---List NFILE window ids in the edit view
 ---@param tabid integer | nil, the EDIT tabid, 0 to use current tab
@@ -516,33 +568,55 @@ function M.editview_query_file_windows(tabid)
     return files, terms
 end
 
----Switch to EDIT and open AI Coder
-function M.open_aicoder()
-    if not aicoder_started then
-        vim.cmd.ClaudeCodeStart()
-        aicoder_started = true
+--- Ensure a "normal" editing state
+--- If in edit view, it will make sure either NTREE or NFILE is focused
+--- If in other view, it will switch the tabpage to edit
+---@param allow_nterm boolean if true, allow nterm to be focused
+---@return boolean true if tabpage is switched
+function M.editview_normalize(allow_nterm)
+    local tabid = M.query_tabid(M.tabt.EDIT)
+    local curr_tabid = vim.api.nvim_get_current_tabpage()
+    local result = false
+    if tabid ~= curr_tabid then
+        vim.api.nvim_set_current_tabpage(tabid)
+        result = true
     end
-    local do_open_aicoder = function()
-        M.editview_focus_then(function()
-            vim.cmd.ClaudeCode()
-        end)
-    end
-
-    M.switch_tab_then(M.tabt.EDIT, function()
-        local bt = M.buftyp()
-        if bt == M.buft.FILETERM then
-            -- already in
-            vim.cmd("startinsert")
-            return
-        end
-        if bt == M.buft.FLOATERM then
+    local wint = M.query_wint()
+    while wint == M.wint.FLOAT or wint == M.wint.TELES do
+        if wint == M.wint.FLOAT then
             vim.cmd.FloatermToggle()
-            vim.defer_fn(do_open_aicoder, 30)
-            return
+        elseif wint == M.wint.TELES then
+            vim.cmd("stopinsert")
+            vim.cmd("normal! <esc>")
         end
-        do_open_aicoder()
-    end)
+        wint = M.query_wint()
+    end
+    if wint == M.wint.NTERM and not allow_nterm then
+        -- find a window in editview to focus
+        local ntree_winid = nil
+        local focused = false
+        for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(tabid)) do
+            wint = M.query_wint(winid)
+            if wint == M.wint.NTREE then
+                ntree_winid = winid
+            end
+            if wint == M.wint.NFILE then
+                focused = true
+                -- just set since NFILE and NTERM can't be the same window
+                vim.api.nvim_set_current_win(winid)
+                break
+            end
+        end
+        if not focused then
+            if ntree_winid then
+                vim.api.nvim_set_current_win(ntree_winid)
+            end
+        end
+    end
+    return result
 end
+
+
 
 ---Close AI Coder UI when in EDIT view
 ---Or close AI Coder Diff when in AIDiff view

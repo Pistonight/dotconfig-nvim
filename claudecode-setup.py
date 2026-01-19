@@ -64,9 +64,9 @@ def apply_patch() -> bool:
         return True
     # Convert CRLF to LF in patch file (Windows only)
     if sys.platform == "win32":
-        content = PATCH_FILE.read_bytes()
-        content = content.replace(b"\r\n", b"\n")
-        PATCH_FILE.write_bytes(content)
+        original_content = PATCH_FILE.read_bytes()
+        modified_content = original_content.replace(b"\r\n", b"\n")
+        PATCH_FILE.write_bytes(modified_content)
         print(f"Converted {PATCH_FILE} to LF line endings.")
     print(f"Applying {PATCH_FILE}...")
     result = run_git("apply", "--3way", str(PATCH_FILE.absolute()), cwd=LOCAL_REPO_PATH, check=False)
@@ -77,6 +77,9 @@ def apply_patch() -> bool:
         print("Please resolve the conflicts manually, then commit your changes.")
         print("After fixing, run this script with --repatch to generate a new patch file.")
         return False
+    if sys.platform == "win32":
+        PATCH_FILE.write_bytes(original_content)
+
     print("Patch applied successfully.")
     return True
 
@@ -118,7 +121,10 @@ def generate_repatch() -> None:
     # Generate diff between the original commit and current HEAD
     result = run_git("diff", COMMIT_HASH, "HEAD", cwd=LOCAL_REPO_PATH)
     # Write the new patch file
-    PATCH_FILE.write_text(result.stdout)
+    content = result.stdout
+    if sys.platform == "win32":
+        content = content.replace(b"\r\n", b"\n")
+    PATCH_FILE.write_text(content)
     print(f"New patch written to {PATCH_FILE}")
     # Clean up the repo
     cleanup()
@@ -152,10 +158,6 @@ def cleanup() -> None:
     if LOCAL_REPO_PATH.exists():
         shutil.rmtree(LOCAL_REPO_PATH)
         print(f"Cleaned up {LOCAL_REPO_PATH}")
-    # Also remove the parent directory if empty
-    if LOCAL_REPO_PATH.parent.exists() and not any(LOCAL_REPO_PATH.parent.iterdir()):
-        LOCAL_REPO_PATH.parent.rmdir()
-        print(f"Cleaned up {LOCAL_REPO_PATH.parent}")
 
 
 def main() -> None:

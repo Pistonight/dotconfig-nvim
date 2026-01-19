@@ -595,9 +595,18 @@ index 7e1b8f0..087768d 100644
  
  return M
 diff --git a/lua/claudecode/init.lua b/lua/claudecode/init.lua
-index c4b7744..9cfc2d8 100644
+index c4b7744..00f2063 100644
 --- a/lua/claudecode/init.lua
 +++ b/lua/claudecode/init.lua
+@@ -298,7 +298,7 @@ function M.send_at_mention(file_path, start_line, end_line, context)
+         -- Open focuses the terminal without toggling/hiding if already focused
+         terminal.open()
+       else
+-        terminal.ensure_visible()
++        -- terminal.ensure_visible()
+       end
+     end
+     return success, error_msg
 @@ -1042,6 +1042,20 @@ function M._create_commands()
      desc = "Deny/reject the current diff changes",
    })

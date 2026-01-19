@@ -35,6 +35,7 @@ require('nvim-treesitter.configs').setup({
 })
 require("claudecode").setup {
     log_level = "error",
+    focus_after_send = false,
     terminal = {
         provider = "native",
         split_width_percentage = 0.4,
