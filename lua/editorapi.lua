@@ -246,8 +246,8 @@ end
 ---@param right boolean if true, end up in the right window
 function M.editview_duplicate(right)
     local tabt = M.query_tabt()
-    if tabt ~= M.tabt.EDIT then return end
-    if vim.bo.buftype == "terminal" then return end -- faster query
+    if tabt ~= M.tabt.EDIT then M.warn("here1") return end
+    if vim.bo.buftype == "terminal" then M.warn("here2") return end -- faster query
 
     local filewins, termwins = M.editview_query_file_windows()
     for _, winid in ipairs(termwins) do
@@ -260,6 +260,7 @@ function M.editview_duplicate(right)
             vim.api.nvim_set_current_win(filewins[1])
         end
         if right then vim.api.nvim_input('<C-w>v<C-W>l') else vim.api.nvim_input('<C-w>v') end
+        M.warn("here3")
         return
     end
     if windows_len == 2 then
@@ -279,15 +280,22 @@ function M.editview_duplicate(right)
         local height = vim.api.nvim_win_get_height(other_winid)
 
         local new_cursor_row_for_view = cursor[1] - screenrow + math.floor((height+1)/2)
+        local bufnr_lc = vim.api.nvim_buf_line_count(bufnr)
+        local need_fallback_view = new_cursor_row_for_view > bufnr_lc
 
         local x_1 = vim.api.nvim_win_get_position(curr_winid)[2]
         local x_2 = vim.api.nvim_win_get_position(other_winid)[2]
+        local need_focus = (x_1 < x_2) == right
 
         vim.api.nvim_win_set_buf(other_winid, bufnr)
-        vim.api.nvim_win_set_cursor(other_winid, { new_cursor_row_for_view, cursor[2] })
-        vim.fn.win_execute(other_winid, "normal! zz")
-        vim.api.nvim_win_set_cursor(other_winid, cursor)
-        if (x_1 < x_2) == right then
+        if need_fallback_view then
+            vim.api.nvim_win_set_cursor(other_winid, cursor)
+        else
+            vim.api.nvim_win_set_cursor(other_winid, { new_cursor_row_for_view, cursor[2] })
+            vim.fn.win_execute(other_winid, "normal! zz")
+            vim.api.nvim_win_set_cursor(other_winid, cursor)
+        end
+        if need_focus then
             vim.api.nvim_set_current_win(other_winid)
         end
     end
