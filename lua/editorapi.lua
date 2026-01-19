@@ -227,17 +227,19 @@ function M.editview_swap_files()
 
     local filewins, _ = M.editview_query_file_windows()
     if #filewins ~= 2 then return end
-
-    local curr_winid = vim.api.nvim_get_current_win()
-    local bufnr1 = vim.api.nvim_win_get_buf(filewins[1])
-    local bufnr2 = vim.api.nvim_win_get_buf(filewins[2])
-    vim.api.nvim_win_set_buf(filewins[1], bufnr2)
-    vim.api.nvim_win_set_buf(filewins[2], bufnr1)
-    if curr_winid == filewins[1] then
-        vim.api.nvim_set_current_win(filewins[2])
-    elseif curr_winid == filewins[2] then
-        vim.api.nvim_set_current_win(filewins[1])
+    -- must use win_splitmove, otherwise it will not work
+    -- if both windows have the same buffer
+    local x_1 = vim.api.nvim_win_get_position(filewins[1])[2]
+    local x_2 = vim.api.nvim_win_get_position(filewins[2])[2]
+    local win_left, win_right
+    if x_1 < x_2 then
+        win_left = filewins[1]
+        win_right = filewins[2]
+    else
+        win_left = filewins[2]
+        win_right = filewins[1]
     end
+    vim.fn.win_splitmove(win_right, win_left, { vertical = true })
 end
 
 ---Duplicate the focused view in edit view
@@ -261,15 +263,33 @@ function M.editview_duplicate(right)
         return
     end
     if windows_len == 2 then
+        -- we don't use split here to avoid motion sickness
         local curr_winid = vim.api.nvim_get_current_win()
+        local other_winid
         if curr_winid == filewins[1] then
-            vim.api.nvim_win_hide(filewins[2])
+            other_winid = filewins[2]
         elseif curr_winid == filewins[2] then
-            vim.api.nvim_win_hide(filewins[1])
+            other_winid = filewins[1]
         else
             return
         end
-        if right then vim.api.nvim_input('<C-w>v<C-W>l') else vim.api.nvim_input('<C-w>v') end
+        local bufnr = vim.api.nvim_win_get_buf(curr_winid)
+        local cursor = vim.api.nvim_win_get_cursor(curr_winid)
+        local screenrow = vim.fn.screenpos(curr_winid, cursor[1], cursor[2]).row
+        local height = vim.api.nvim_win_get_height(other_winid)
+
+        local new_cursor_row_for_view = cursor[1] - screenrow + math.floor((height+1)/2)
+
+        local x_1 = vim.api.nvim_win_get_position(curr_winid)[2]
+        local x_2 = vim.api.nvim_win_get_position(other_winid)[2]
+
+        vim.api.nvim_win_set_buf(other_winid, bufnr)
+        vim.api.nvim_win_set_cursor(other_winid, { new_cursor_row_for_view, cursor[2] })
+        vim.fn.win_execute(other_winid, "normal! zz")
+        vim.api.nvim_win_set_cursor(other_winid, cursor)
+        if (x_1 < x_2) == right then
+            vim.api.nvim_set_current_win(other_winid)
+        end
     end
 end
 
@@ -338,6 +358,10 @@ function M.editview_terminal_escape()
         vim.api.nvim_input("<C-w>")
     end
 end
+
+
+-- VIEW CHANGE / Telescope =====================================================================
+
 ---Switch to tab based on type, execute the callback if succeeded
 ---return true if switch successful
 function M.switch_tab_then(tab_type, cb)
