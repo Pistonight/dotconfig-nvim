@@ -22,6 +22,7 @@ M.wint = {
     NOTIF = 0x0110,     -- Notification Window
     FLOAT = 0x0111,     -- Floating Window
     TELES = 0x0112,     -- Telescope
+    TSCTX = 0x0122,     -- Treesitter Context
     AIFILE = 0x0201,    -- Original file in AI Diff
     AIDIFF = 0x0202,    -- Proposed change in AI Diff
     DTREE = 0x0301,     -- Tree in diff view
@@ -62,6 +63,13 @@ function M.print_state()
         wints_str[winid] = enumname(wint)
     end
     local msg = "s_tabts=" .. vim.inspect(tabts_str) .. "\ns_tabmp="..vim.inspect(tabmp_str).."\ns_wints="..vim.inspect(wints_str)
+    local filewins, _ = M.editview_query_file_windows()
+    local filewins_tb = {}
+    for _, winid in ipairs(filewins) do
+        local bufnr = vim.api.nvim_win_get_buf(winid)
+        filewins_tb[winid] = "bufnr "..bufnr.." ft:"..vim.bo.filetype.." bt:"..vim.bo.buftype.." name:"..vim.api.nvim_buf_get_name(bufnr).." undolevels:"..vim.bo[bufnr].undolevels
+    end
+    msg = msg .. "\nfilewins=" .. vim.inspect(filewins_tb)
     vim.api.nvim_echo({{ msg, "Normal" }}, true, {})
 end
 
@@ -146,7 +154,9 @@ function M.calc_wint(winid)
 
     local tabid = vim.api.nvim_win_get_tabpage(winid)
     local tabtype = M.query_tabt(tabid)
-    if tabtype == M.tabt.EDIT    then return M.wint.NFILE end
+    if tabtype == M.tabt.EDIT then
+        return M.wint.NFILE
+    end
     if tabtype == M.tabt.AI_DIFF then return M.wint.AIFILE end
     return M.wint.DFILE
 end
@@ -203,6 +213,10 @@ function M.calc_wint_fast(winid)
     if bufname:match("%.claude%-proposed") ~= nil then
         return M.wint.AIDIFF
     end
+    -- HACK: Treesitter Context
+    if bufname == "" and vim.bo[bufnr].undolevels == -1 then
+        return M.wint.TSCTX
+    end
 
     return M.wint.INVALID
 end
@@ -246,8 +260,8 @@ end
 ---@param right boolean if true, end up in the right window
 function M.editview_duplicate(right)
     local tabt = M.query_tabt()
-    if tabt ~= M.tabt.EDIT then M.warn("here1") return end
-    if vim.bo.buftype == "terminal" then M.warn("here2") return end -- faster query
+    if tabt ~= M.tabt.EDIT then return end
+    if vim.bo.buftype == "terminal" then return end -- faster query
 
     local filewins, termwins = M.editview_query_file_windows()
     for _, winid in ipairs(termwins) do
@@ -260,7 +274,6 @@ function M.editview_duplicate(right)
             vim.api.nvim_set_current_win(filewins[1])
         end
         if right then vim.api.nvim_input('<C-w>v<C-W>l') else vim.api.nvim_input('<C-w>v') end
-        M.warn("here3")
         return
     end
     if windows_len == 2 then
@@ -281,23 +294,23 @@ function M.editview_duplicate(right)
 
         local new_cursor_row_for_view = cursor[1] - screenrow + math.floor((height+1)/2)
         local bufnr_lc = vim.api.nvim_buf_line_count(bufnr)
-        local need_fallback_view = new_cursor_row_for_view > bufnr_lc
+        local need_fixview = new_cursor_row_for_view <= bufnr_lc
 
         local x_1 = vim.api.nvim_win_get_position(curr_winid)[2]
         local x_2 = vim.api.nvim_win_get_position(other_winid)[2]
         local need_focus = (x_1 < x_2) == right
 
         vim.api.nvim_win_set_buf(other_winid, bufnr)
-        if need_fallback_view then
-            vim.api.nvim_win_set_cursor(other_winid, cursor)
-        else
+        if need_fixview then
             vim.api.nvim_win_set_cursor(other_winid, { new_cursor_row_for_view, cursor[2] })
             vim.fn.win_execute(other_winid, "normal! zz")
-            vim.api.nvim_win_set_cursor(other_winid, cursor)
         end
         if need_focus then
             vim.api.nvim_set_current_win(other_winid)
         end
+        -- need to set cursor in the end to proper trigger cursor move (like TS context)
+        vim.api.nvim_win_set_cursor(other_winid, cursor)
+        return
     end
 end
 
