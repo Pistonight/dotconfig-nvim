@@ -41,6 +41,8 @@ local function enumname(value)
 end
 
 -- AUTOCOMMANDS ========================================================================
+
+M.s_enable_nterm_autofocus = true
 vim.api.nvim_create_autocmd("BufEnter", {
     callback = function()
         -- cannot save cache when query, because BufEnter
@@ -48,21 +50,26 @@ vim.api.nvim_create_autocmd("BufEnter", {
         local wint = M.query_wint(nil, true)
 
         if wint == M.wint.NTERM then
-            vim.cmd("startinsert")
+            -- this is needed to prevent focusing too early when switching tabs
+            if M.s_enable_nterm_autofocus then
+                vim.cmd("startinsert")
+            end
+            return
         end
-    --         elseif bt == editorapi.buft.AIDIFF then
-    --             local current_buf = vim.api.nvim_get_current_buf()
-    --             for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-    --                 local bufnr = vim.api.nvim_win_get_buf(winid)
-    --                 if bufnr ~= current_buf then
-    --                     local ft = vim.bo[bufnr].filetype
-    --                     if ft and ft ~= "" then
-    --                         vim.bo[current_buf].filetype = ft
-    --                         break
-    --                     end
-    --                 end
-    --             end
-    --         end
+        if wint == M.wint.AIDIFF then
+            local current_buf = vim.api.nvim_get_current_buf()
+            for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+                local bufnr = vim.api.nvim_win_get_buf(winid)
+                if bufnr ~= current_buf then
+                    local ft = vim.bo[bufnr].filetype
+                    if ft and ft ~= "" then
+                        vim.bo[current_buf].filetype = ft
+                        break
+                    end
+                end
+            end
+        end
+
     end
 })
 
@@ -241,7 +248,7 @@ function M.calc_wint_fast(winid)
         return M.wint.TELES
     end
     local bufname = vim.api.nvim_buf_get_name(bufnr)
-    if bufname:match("%.claude%-proposed") ~= nil then
+    if M.aicoder_is_diff_bufname(bufname) then
         return M.wint.AIDIFF
     end
     -- HACK: Treesitter Context
@@ -440,41 +447,70 @@ function M.editview_openfinder_file()
 end
 
 function M.editview_openfinder_live_grep()
+    local wint = M.query_wint()
+    if wint == M.wint.TELES then return end
+    telescope_is_opened_from_aicoder = wint == M.wint.NTERM
+    M.editview_normalize(false)
     require('telescope.builtin').live_grep {
         attach_mappings = telescope_attach_file_picker_mappings
     }
 end
 
 function M.editview_openfinder_buffer()
+    local wint = M.query_wint()
+    if wint == M.wint.TELES then return end
+    telescope_is_opened_from_aicoder = wint == M.wint.NTERM
+    M.editview_normalize(false)
     require('telescope.builtin').buffers {
         attach_mappings = telescope_attach_file_picker_mappings
     }
 end
 
-function M.open_definition_finder()
-    M.switch_to_editview_then(function() require("telescope.builtin").lsp_definitions() end)
+function M.editview_openfinder_symbol()
+    local wint = M.query_wint()
+    if wint == M.wint.TELES then return end
+    telescope_is_opened_from_aicoder = false
+    M.editview_normalize(false)
+    require("telescope.builtin").treesitter()
 end
 
-function M.open_reference_finder()
-    M.switch_to_editview_then(function() require("telescope.builtin").lsp_references() end)
+function M.editview_openfinder_definition()
+    local wint = M.query_wint()
+    if wint == M.wint.TELES then return end
+    telescope_is_opened_from_aicoder = false
+    M.editview_normalize(false)
+    require("telescope.builtin").lsp_definitions()
 end
 
-function M.open_implementation_finder()
-    M.switch_to_editview_then(function() require("telescope.builtin").lsp_implementations() end)
+function M.editview_openfinder_reference()
+    local wint = M.query_wint()
+    if wint == M.wint.TELES then return end
+    telescope_is_opened_from_aicoder = false
+    M.editview_normalize(false)
+    require("telescope.builtin").lsp_references()
 end
 
----View diagnostics of current buffer
-function M.open_diagnostic_finder()
-    M.switch_to_editview_then(function() require("telescope.builtin").diagnostics({ bufnr = 0 }) end)
+function M.editview_openfinder_implementation()
+    local wint = M.query_wint()
+    if wint == M.wint.TELES then return end
+    telescope_is_opened_from_aicoder = false
+    M.editview_normalize(false)
+    require("telescope.builtin").lsp_implementations()
 end
 
-function M.open_symbol_finder()
-    M.switch_to_editview_then(function() require("telescope.builtin").treesitter() end)
+function M.editview_openfinder_diagnostic()
+    local wint = M.query_wint()
+    if wint == M.wint.TELES then return end
+    telescope_is_opened_from_aicoder = false
+    M.editview_normalize(false)
+    require("telescope.builtin").diagnostics({ bufnr = 0})
 end
 
 -- VIEW CHANGE / AI Coder =====================================================================
 
 local aicoder_started = false
+local was_aicoder_focused_when_aidiff_open = false
+local just_accepted_aidiff = false
 ---Switch to EDIT and open AI Coder
 function M.editview_aicoder_open()
     if M.query_wint() == M.wint.NTERM then
@@ -539,10 +575,140 @@ function M.editview_aicoder_open()
     M.warn("editview_open_aicoder: too many file windows")
 end
 
+---Close AI Coder UI when in EDIT view
+---Or close AI Coder Diff when in AIDiff view
+function M.aicoder_close()
+    local tabt = M.query_tabt()
+    if tabt == M.tabt.AI_DIFF then
+        local tabid = M.query_tabid(M.tabt.EDIT)
+        vim.api.nvim_set_current_tabpage(tabid)
+        return
+    end
+    if tabt == M.tabt.EDIT then
+        for _, winid in ipairs(vim.api.nvim_list_wins()) do
+            if M.query_wint(winid) == M.wint.NTERM then
+                vim.api.nvim_win_hide(winid)
+            end
+        end
+        vim.cmd.ClaudeCodeNotificationDismiss()
+        return
+    end
+end
+
+function M.aicoder_check_auto_open_diff()
+    if just_accepted_aidiff or M.aicoder_is_focused() then
+        was_aicoder_focused_when_aidiff_open = true
+        return true
+    end
+    was_aicoder_focused_when_aidiff_open = false
+    return false
+end
+
+---If not looking at AIDiff, open it
+---Otherwise accept it
+function M.aicoder_open_or_accept_diff()
+    local tabid = M.query_tabid(M.tabt.AI_DIFF)
+    if tabid ~= nil then
+        local curr_tabid = vim.api.nvim_get_current_tabpage()
+        if curr_tabid == tabid then
+            -- accept
+            -- make sure no unsaved modifications in all opened windows
+            for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+                local wint = M.query_wint(winid)
+                if wint == M.wint.AIDIFF or wint == M.wint.AIFILE then
+                    local bufnr = vim.api.nvim_win_get_buf(winid)
+                    if vim.bo[bufnr].modified then
+                        M.warn("diff is unsaved, must save before accepting")
+                        return
+                    end
+                end
+            end
+            local should_focus = was_aicoder_focused_when_aidiff_open
+            just_accepted_aidiff = true
+            -- close the aidiff
+            vim.cmd(vim.api.nvim_tabpage_get_number(tabid) .. "tabclose")
+            -- switch to edit
+            local edit_tabid = M.query_tabid(M.tabt.EDIT)
+            M.s_enable_nterm_autofocus = false
+            vim.api.nvim_set_current_tabpage(edit_tabid)
+            -- close any dangling aidiff buffers if needed
+            for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+                local bufname = vim.api.nvim_buf_get_name(bufnr)
+                if M.aicoder_is_diff_bufname(bufname) then
+                    vim.api.nvim_buf_delete(bufnr, {force=false})
+                end
+            end
+            vim.cmd.ClaudeCodeDiffAccept()
+            if should_focus then
+                -- defer to realize the tab switch
+                vim.defer_fn(function()
+                    M.s_enable_nterm_autofocus = true
+                    M.editview_aicoder_open()
+                    M.warn("accepted aidiff")
+                    vim.defer_fn(function()
+                        just_accepted_aidiff = false
+                    end, 500)
+                end, 500)
+            else
+                M.warn("accepted aidiff")
+                vim.defer_fn(function()
+                    M.s_enable_nterm_autofocus = true
+                end, 500)
+            end
+        else
+            -- open existing
+            was_aicoder_focused_when_aidiff_open = M.aicoder_is_focused()
+            vim.api.nvim_set_current_tabpage(tabid)
+        end
+        return
+    end
+    -- open new
+    was_aicoder_focused_when_aidiff_open = M.aicoder_is_focused()
+    vim.cmd.ClaudeCodeOpenCodeDiff()
+end
+
+function M.aicoder_deny_diff()
+    -- note we allow denying without the diff open
+    -- say we forgot some instruction and want to deny the output
+    -- without checking
+    local should_focus = M.query_wint() == M.wint.NTERM
+    local aidiff_tabid = M.query_tabid(M.tabt.AI_DIFF)
+    should_focus = should_focus or vim.api.nvim_get_current_tabpage() == aidiff_tabid
+    M.s_enable_nterm_autofocus = false
+    local tab_switched = M.editview_normalize(false)
+    -- force close the diff buffers
+    for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+        local bufname = vim.api.nvim_buf_get_name(bufnr)
+        if M.aicoder_is_diff_bufname(bufname) then
+            vim.api.nvim_buf_delete(bufnr, {force=true})
+        end
+    end
+    if aidiff_tabid ~= nil then
+        vim.cmd(vim.api.nvim_tabpage_get_number(aidiff_tabid) .. "tabclose")
+    end
+    vim.cmd.ClaudeCodeDiffDeny()
+    if tab_switched then
+        -- defer to realize the tab switch
+        vim.defer_fn(function()
+            M.s_enable_nterm_autofocus = true
+            if should_focus then
+                M.editview_aicoder_open()
+            end
+            M.warn("denied aidiff")
+        end, 500)
+    else
+        M.s_enable_nterm_autofocus = true
+        if should_focus then
+            M.editview_aicoder_open()
+        end
+        M.warn("denied aidiff")
+    end
+end
+
 ---Check if currently focused on aicoder (in the right buffer and terminal mode)
-function M.is_aicoder_focused()
+function M.aicoder_is_focused()
     if vim.api.nvim_get_mode().mode == "t" then
-        if M.buftyp() == M.buft.FILETERM then
+        if M.query_wint() == M.wint.NTERM then
             return true
         end
     end
@@ -618,110 +784,6 @@ end
 
 
 
----Close AI Coder UI when in EDIT view
----Or close AI Coder Diff when in AIDiff view
-function M.close_aicoder()
-    -- local tt = M.tabtyp()
-    -- if tt == M.tabt.EDIT then
-    --     for _, winid in ipairs(vim.api.nvim_list_wins()) do
-    --         local bufnr = vim.api.nvim_win_get_buf(winid)
-    --         if M.buftyp(bufnr) == M.buft.FILETERM then
-    --             vim.api.nvim_win_hide(winid)
-    --         end
-    --     end
-    --     vim.cmd.ClaudeCodeNotificationDismiss()
-    --     return
-    -- end
-    -- if tt == M.tabt.AIDIFF then
-    --     vim.cmd.CodeDiff()
-    --     vim.defer_fn(function()
-    --         M.switch_to_editview_then(nil)
-    --     end, 30)
-    --     return
-    -- end
-end
-
-M.was_aicoder_focused_when_aidiff_open = false
-M.just_accepted_aidiff = false
-
----If not looking at AIDiff, open it
----Otherwise accept it
-function M.open_or_accept_aidiff()
-    local tt = M.tabtyp()
-    if tt == M.tabt.AIDIFF then
-        local should_focus = M.was_aicoder_focused_when_aidiff_open
-        -- already looking at diff, accept it
-        -- make sure no unsaved modifications in all opened windows
-        for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-            local bufnr = vim.api.nvim_win_get_buf(winid)
-            local buft = M.buftyp(bufnr)
-            if buft == M.buft.AIDIFF or buft == M.buft.AIFILE then
-                if vim.bo[bufnr].modified then
-                    M.warn("diff is unsaved, must save before accepting")
-                    return
-                end
-            end
-        end
-        local curr_tabpage = vim.api.nvim_get_current_tabpage()
-        M.just_accepted_aidiff = true
-        vim.cmd.ClaudeCodeDiffAccept()
-        M.switch_to_editview_then(function()
-            -- close the aidiff
-            vim.cmd(vim.api.nvim_tabpage_get_number(curr_tabpage) .. "tabclose")
-            M.switch_to_editview_then(function()
-                -- close any dangling aidiff buffers if needed
-                for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-                    if M.buftyp(bufnr) == M.buft.AIDIFF then
-                        vim.api.nvim_buf_delete(bufnr, {force=false})
-                    end
-                end
-                if should_focus then
-                    vim.defer_fn(function()
-                        if M.tabtyp() == M.tabt.EDIT then
-                            vim.cmd.ClaudeCodeFocus()
-                        end
-                        M.just_accepted_aidiff = false
-                    end, 500)
-                end
-                M.warn("accepted aidiff")
-            end)
-        end)
-    end
-    M.was_aicoder_focused_when_aidiff_open = M.is_aicoder_focused()
-    local tabpages = M.query_tabpages()
-    local tabpage_aidiff = tabpages[M.tabt.AIDIFF]
-    if tabpage_aidiff == nil then
-        -- open new code diff
-        vim.cmd.ClaudeCodeOpenCodeDiff()
-        return
-    end
-    M.switch_tab_then(M.tabt.AIDIFF, nil)
-end
-
-function M.deny_aidiff()
-    -- note we allow denying without the diff open
-    -- say we forgot some instruction and want to deny the output
-    -- without checking
-    local curr_tabpage = vim.api.nvim_get_current_tabpage()
-    local is_in_aidiff = M.tabtyp() == M.tabt.AIDIFF
-    vim.cmd.ClaudeCodeDiffDeny()
-    M.switch_to_editview_then(function()
-        vim.cmd(vim.api.nvim_tabpage_get_number(curr_tabpage) .. "tabclose")
-        M.switch_to_editview_then(function()
-            -- force close the diff buffers
-            for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-                if M.buftyp(bufnr) == M.buft.AIDIFF then
-                    vim.api.nvim_buf_delete(bufnr, {force=true})
-                end
-            end
-            if is_in_aidiff then
-                -- probably want to tell AI what to do differently
-                vim.cmd.ClaudeCodeFocus()
-            end
-            M.warn("denied aidiff")
-        end)
-    end)
-end
 
 ---Send context to AI Coder
 ---@param visual boolean if in visual mode
@@ -756,6 +818,11 @@ function M.send_to_aicoder(visual)
         end, 100)
     end)
 end
+
+function M.aicoder_is_diff_bufname(bufname)
+    return bufname:match("%.claude%-proposed") ~= nil
+end
+
 
 local git_diff_type = ""
 
