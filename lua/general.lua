@@ -139,19 +139,14 @@ local _ = (function()
     noremap({'n', 't'}, '<leader>bg', editorapi.aicoder_close)
     noremap({'n', 't'}, '<leader>bv', editorapi.aicoder_open_or_accept_diff)
     noremap({'n', 't'}, '<leader>bd', editorapi.aicoder_deny_diff)
-    noremap('n', '<leader>bl', function() editorapi.send_to_aicoder(false) end)
-    noremap('v', '<leader>bl', function() editorapi.send_to_aicoder(true) end)
-    noremap('n', '<leader>gs', function() editorapi.open_git_diff('status') end)
-    noremap('n', '<leader>gd', function()
-        vim.ui.input({ prompt = 'Git diff: ' }, function(input)
-            if input then
-                editorapi.open_git_diff(input)
-            end
-        end)
-    end)
+    noremap('n', '<leader>bl', function() editorapi.aicoder_send(false) end)
+    noremap('v', '<leader>bl', function() editorapi.aicoder_send(true) end)
+    noremap('n', '<leader>gs', editorapi.diffview_git_view_or_status)
+    noremap('n', '<leader>gd', editorapi.diffview_git_diff_new)
 
     -- focus on tree (edit mode and diff mode)
-    noremap('n', '<leader>t', editorapi.open_file_tree)
+    noremap('n', '<leader>t', function() editorapi.open_file_tree(false) end)
+    noremap('n', '<leader>T', function() editorapi.open_file_tree(true) end)
 
 
     -- Other key mappings that requires plugin to be loaded first

@@ -261,6 +261,24 @@ end
 
 -- VIEW CHANGE =====================================================================
 
+function M.editview_open_split()
+    local tabt = M.query_tabt()
+    if tabt ~= M.tabt.EDIT then return end
+    if vim.bo.buftype == "terminal" then return end -- faster query
+
+    local filewins, termwins = M.editview_query_file_windows()
+    for _, winid in ipairs(termwins) do
+        vim.api.nvim_win_hide(winid)
+    end
+
+    local tree = require("nvim-tree.api")
+    if #filewins < 2 then
+        tree.node.open.vertical()
+    else
+        tree.node.open.edit()
+    end
+end
+
 ---Swap the 2 files in edit view
 function M.editview_swap_files()
     local tabt = M.query_tabt()
@@ -705,6 +723,41 @@ function M.aicoder_deny_diff()
     end
 end
 
+
+---Send context to AI Coder
+---@param visual boolean if in visual mode
+function M.aicoder_send(visual)
+    local tabt = M.query_tabt()
+    if tabt ~= M.tabt.EDIT then
+        M.warn("can only send to aicoder in edit view")
+        return
+    end
+    local wint = M.query_wint()
+    if wint == M.wint.NTREE then
+        if visual then return end
+        -- send file in tree
+        vim.cmd.ClaudeCodeTreeAdd()
+        M.editview_aicoder_open()
+        return
+    end
+    if wint ~= M.wint.NFILE then
+        return
+    end
+    if visual then
+        vim.api.nvim_input("gv<cmd>ClaudeCodeSend<cr>")
+        -- need to defer to realize the send above first
+        vim.defer_fn(function()
+            M.editview_aicoder_open()
+        end, 200)
+    else
+        vim.cmd("ClaudeCodeAdd %")
+    end
+end
+
+function M.aicoder_is_diff_bufname(bufname)
+    return bufname:match("%.claude%-proposed") ~= nil
+end
+
 ---Check if currently focused on aicoder (in the right buffer and terminal mode)
 function M.aicoder_is_focused()
     if vim.api.nvim_get_mode().mode == "t" then
@@ -716,7 +769,6 @@ function M.aicoder_is_focused()
 end
 
 -- VIEW CHANGE / Helpers =====================================================================
-
 
 ---List NFILE window ids in the edit view
 ---@param tabid integer | nil, the EDIT tabid, 0 to use current tab
@@ -782,104 +834,59 @@ function M.editview_normalize(allow_nterm)
     return result
 end
 
+-- Diff =====================================================================
 
-
-
----Send context to AI Coder
----@param visual boolean if in visual mode
-function M.send_to_aicoder(visual)
-    local tt, bt = M.viewtyp()
-    if tt ~= M.tabt.EDIT then
-        return
+--- View existing git diff, or open git status
+function M.diffview_git_view_or_status()
+    local tabid = M.query_tabid(M.tabt.DIFF)
+    if tabid ~= nil then
+        vim.api.nvim_set_current_tabpage(tabid)
+        return;
     end
-    if bt == M.buft.TREE then
-        if visual then return end
-        -- send file in tree
-        vim.cmd.ClaudeCodeTreeAdd()
-        vim.cmd.ClaudeCodeFocus()
-        return
-    end
-    if bt ~= M.buft.FILE then
-        return
-    end
-    M.editview_focus_then(function()
-        if visual then
-            vim.api.nvim_input("gv<cmd>ClaudeCodeSend<cr>")
-        else
-            vim.cmd("ClaudeCodeAdd %")
-        end
-        -- keep focus inside fileterm
-        vim.defer_fn(function()
-            if M.buftyp() ~= M.buft.FILETERM then
-                vim.cmd("stopinsert")
-                vim.api.nvim_input("<C-w>l")
-                vim.cmd("startinsert")
-            end
-        end, 100)
-    end)
+    vim.cmd.CodeDiff()
 end
 
-function M.aicoder_is_diff_bufname(bufname)
-    return bufname:match("%.claude%-proposed") ~= nil
-end
-
-
-local git_diff_type = ""
-
----
-function M.open_git_diff(diff_type)
-    local tabpages = M.query_tabpages()
-    local tabpage_diff = tabpages[M.tabt.DIFF]
-    local do_open = function()
-        git_diff_type = diff_type
-        if diff_type == "status" then
-            vim.cmd.CodeDiff()
-        else
-            -- otherwise it could be:
+--- Prompt for revs for diff
+function M.diffview_git_diff_new()
+    local tabid = M.query_tabid(M.tabt.DIFF)
+    if tabid ~= nil then
+        vim.cmd(vim.api.nvim_tabpage_get_number(tabid) .. "tabclose")
+    end
+    vim.ui.input({ prompt = 'Git diff ( [OLD] or [OLD..NEW] ): ' }, function(input)
+        if input then
             -- A..B: diff from commit A to commit B
             -- A: (just the commit/branch name)
-            if diff_type:find("%.%.") then
-                local a, b = diff_type:match("(.+)%.%.(.+)")
+            if input:find("%.%.") then
+                local a, b = input:match("(.+)%.%.(.+)")
                 if a and b then
                     vim.cmd("CodeDiff " .. a .. " " .. b)
                 end
             else
-                vim.cmd("CodeDiff " .. diff_type)
+                vim.cmd("CodeDiff " .. input)
             end
         end
-        -- -- focus on tree
-        -- vim.defer_fn(function()
-        --     vim.api.nvim_input("<C-w>h<C-w>h")
-        -- end, 200)
-    end
-    if tabpage_diff ~= nil then
-        -- if a different diff is opened, close it
-        if git_diff_type ~= diff_type then
-            vim.api.nvim_command(vim.api.nvim_tabpage_get_number(tabpage_diff).. "tabclose")
-            M.switch_to_editview_then(do_open)
-        else
-            -- otherwise just open that diff
-            M.switch_tab_then(M.tabt.DIFF, nil)
-        end
-        return
-    end
-    -- no diff opened, just open new one
-    M.switch_to_editview_then(do_open)
+    end)
 end
 
-function M.open_file_tree()
-    local tt = M.tabtyp()
-    if tt == M.tabt.EDIT then
-        vim.cmd.NvimTreeOpen()
+--- Open/Focus file tree
+---@param sync boolean if true, sync the file in an already opened tree (NTree only)
+function M.open_file_tree(sync)
+    local tabt = M.query_tabt()
+    if tabt == M.tabt.EDIT then
+        if sync then
+            require('nvim-tree.api').tree.find_file()
+        else
+            vim.cmd.NvimTreeOpen()
+        end
         return
     end
-    if tt == M.tabt.DIFF then
+    if tabt == M.tabt.DIFF then
         vim.api.nvim_input("<C-w>h<C-w>h")
         vim.defer_fn(function()
-            if M.buftyp() ~= M.buft.DIFFTREE then
-                vim.api.nvim_input("<leader>T<C-w>h")
+            if M.query_wint() ~= M.wint.DTREE then
+                vim.api.nvim_input("<leader>pT<C-w>h")
             end
-        end, 30)
+        end, 50)
     end
 end
 

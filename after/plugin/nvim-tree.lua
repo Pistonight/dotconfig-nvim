@@ -1,12 +1,6 @@
 local api = require "nvim-tree.api"
-vim.cmd([[
-    augroup NvimTreeAutoFocus
-        autocmd BufEnter * lua require'nvim-tree.api'.tree.find_file()
-    augroup END
-]])
-local function on_attach_nvim_tree(bufnr)
-    -- setup lualine only after nvim tree attach
-    -- to avoid loading it too early onto the tree
+local lualine_setup_done = false
+local function setup_lualine()
     local lualine_theme = require("lualine.themes.catppuccin")
     lualine_theme.normal.a.gui = ""
     lualine_theme.insert.a.gui = ""
@@ -40,7 +34,15 @@ local function on_attach_nvim_tree(bufnr)
             }
         }
     })
+end
+local function on_attach_nvim_tree(bufnr)
+    -- setup lualine only after nvim tree attach
+    -- to avoid loading it too early onto the tree
     -- only attack keys i need
+    if not lualine_setup_done then
+        lualine_setup_done = true
+        setup_lualine()
+    end
     local function opts(desc)
         return {
             desc = 'nvim-tree: ' .. desc,
@@ -55,10 +57,7 @@ local function on_attach_nvim_tree(bufnr)
     vim.keymap.set('n', 'P', api.node.navigate.parent, opts('Go to parent'))
     vim.keymap.set('n', 'm', api.fs.rename_sub, opts('Move'))
     vim.keymap.set('n', 'o', api.node.open.edit, opts('Open'))
-    vim.keymap.set('n', 'v', function()
-        require("editorapi").close_aicoder()
-        api.node.open.vertical()
-    end, opts('Open: vertical'))
+    vim.keymap.set('n', 'v', require("editorapi").editview_open_split , opts('Open: vertical'))
     vim.keymap.set('n', 's', api.node.open.horizontal, opts('Open: split'))
     vim.keymap.set('n', 'a', api.fs.create, opts('Create'))
     vim.keymap.set('n', 'c', api.fs.copy.node, opts('Copy'))
@@ -123,7 +122,7 @@ require("codediff").setup {
     keymaps = {
         view = {
             quit = "<esc>",                    -- Close diff tab
-            toggle_explorer = "<leader>T",  -- Toggle explorer visibility (explorer mode only)
+            toggle_explorer = "<leader>pT",  -- Toggle explorer visibility (explorer mode only)
             next_hunk = "]c",   -- Jump to next change
             prev_hunk = "[c",   -- Jump to previous change
             next_file = "]f",   -- Next file in explorer mode
