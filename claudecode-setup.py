@@ -48,7 +48,7 @@ def remove_local_repo() -> None:
     except OSError:
         print(f"ERROR: Failed to remove {LOCAL_REPO_PATH}, will retry", file=sys.stderr)
         time.sleep(2)
-        shutil.rmtree(LOCAL_REPO_PATH)
+    shutil.rmtree(LOCAL_REPO_PATH)
 
 
 def sparse_checkout_repo() -> None:

@@ -648,7 +648,7 @@ function M.aicoder_open_or_accept_diff()
                     vim.defer_fn(function()
                         just_accepted_aidiff = false
                     end, 500)
-                end, 500)
+                end, 50)
             else
                 M.warn("accepted aidiff")
                 vim.defer_fn(function()
@@ -695,7 +695,7 @@ function M.aicoder_deny_diff()
                 M.editview_aicoder_open()
             end
             M.warn("denied aidiff")
-        end, 500)
+        end, 50)
     else
         M.s_enable_nterm_autofocus = true
         if should_focus then
