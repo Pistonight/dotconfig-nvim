@@ -1,5 +1,6 @@
-local frappe = require("catppuccin.palettes").get_palette("frappe")
-local mocha = require("catppuccin.palettes").get_palette("mocha")
+local palettes = require("catppuccin.palettes")
+local frappe = palettes.get_palette("frappe")
+local mocha = palettes.get_palette("mocha")
 
 require("catppuccin").setup({
     flavour = "auto", -- latte, frappe, macchiato, mocha
@@ -84,6 +85,8 @@ require("catppuccin").setup({
             Floaterm = { bg = frappe.base },
             FloatermNC = { bg = frappe.crust },
             FloatermBorder = { bg = frappe.base },
+
+            LspInlayHint = { bg = mocha.surface0, fg = mocha.subtext1 },
 
             -- diffs
             DiffDelete = { bg = "#53394d" }, -- 25% mocha.red on mocha.base

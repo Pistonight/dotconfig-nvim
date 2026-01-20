@@ -1,5 +1,6 @@
 require("claudecode").setup {
     log_level = "error",
+    auto_start = true,
     focus_after_send = false,
     terminal = {
         provider = "native",

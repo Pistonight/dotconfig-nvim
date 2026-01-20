@@ -24,7 +24,7 @@
 Usage: setup.py [command]
 
 Commands:
-  nuke            Nuke existing configurations
+  nuke            Nuke existing configurations and everything you installed
   apply           Apply updated configurations
   merge PART      Merge configurations of PART
     PART: [claudecode]
@@ -137,8 +137,63 @@ def merge_claudecode():
 
 def repack():
     """Pack local configurations for update."""
-    # TODO: Implement repack command
-    print("repack: not implemented")
+    info = read_info()
+    claude = info["claude"]
+
+    data_path = get_std_data_path()
+    config_path = get_std_config_path()
+
+    repo_path = os.path.join(data_path, claude["data-path"])
+    local_path = os.path.join(config_path, claude["config-path"])
+    patch_path = os.path.join(config_path, claude["patch"])
+    base_commit = claude["commit"]
+    sparse_paths = claude["sparse"]
+
+    if not os.path.isdir(local_path):
+        print(f"repack: local config not found at {local_path}")
+        sys.exit(1)
+
+    # Set up the repo with sparse checkout and shallow clone
+    checkout_repo(repo_path, claude["repo"], base_commit, True, sparse_paths)
+
+    # Replace each sparse path in the repo with the local config version
+    for sparse_path in sparse_paths:
+        # Remove trailing slash if present for path operations
+        sparse_dir = sparse_path.rstrip("/")
+
+        repo_sparse_path = os.path.join(repo_path, sparse_dir)
+        local_sparse_path = os.path.join(local_path, sparse_dir)
+
+        if not os.path.exists(local_sparse_path):
+            print(f"repack: local path not found: {local_sparse_path}")
+            continue
+
+        # Delete the directory in the repo
+        if os.path.exists(repo_sparse_path):
+            rmdir(repo_sparse_path)
+
+        # Copy the local version to the repo
+        shutil.copytree(local_sparse_path, repo_sparse_path)
+        print(f"copied: {local_sparse_path} -> {repo_sparse_path}")
+
+    # Generate diff from the dirty working tree
+    result = subprocess.run(
+        ["git", "-C", repo_path, "diff"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    if not result.stdout.strip():
+        print("repack: no changes detected")
+        return
+
+    # Write the patch
+    write_patch(patch_path, result.stdout)
+    print(f"repack: patch written to {patch_path}")
+
+    # Restore the work tree
+    restore_work_tree(repo_path)
 
 
 def usage():
@@ -282,6 +337,11 @@ def checkout_repo(path, repo, ref, shallow, sparse):
         os.makedirs(os.path.dirname(sparse_file), exist_ok=True)
         with open(sparse_file, "w") as f:
             f.write("\n".join(sparse) + "\n")
+
+    subprocess.run(
+        ["git", "-C", path, "config", "advice.detachedHead", "false"],
+        check=True,
+    )
 
     if shallow:
         subprocess.run(["git", "-C", path, "fetch", "--depth", "1", "origin", ref], check=True,)

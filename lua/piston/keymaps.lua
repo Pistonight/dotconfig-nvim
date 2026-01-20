@@ -96,6 +96,8 @@ function M.setup()
     -- focus on tree (edit mode and diff mode)
     noremap('n', '<leader>t', function() editorapi.open_file_tree(false) end)
     noremap('n', '<leader>T', function() editorapi.open_file_tree(true) end)
+
+    noremap({'n', 'v'}, 'I', editorapi.multipurpose_toggle_shift_i)
 end
 
 ---Setup key maps for nvim tree buffer
@@ -131,7 +133,6 @@ function M.setup_nvim_tree(bufnr)
     vim.keymap.set('n', ']', api.node.navigate.diagnostics.next, opts('Next diagnostic'))
     vim.keymap.set('n', 'B', api.tree.toggle_no_buffer_filter, opts('Toggle opened'))
     vim.keymap.set('n', 'H', api.tree.toggle_hidden_filter, opts('Toggle dotfiles'))
-    vim.keymap.set('n', 'I', api.tree.toggle_gitignore_filter, opts('Toggle gitignore'))
     vim.keymap.set('n', 'q', api.tree.close, opts('Close'))
     vim.keymap.set('n', 'R', api.tree.reload, opts('Refresh'))
     vim.keymap.set('n', 'gy', api.fs.copy.absolute_path, opts('Copy absolute path'))
@@ -140,12 +141,77 @@ function M.setup_nvim_tree(bufnr)
     vim.keymap.set('n', 'g?', api.tree.toggle_help, opts('Help'))
 end
 
+function M.setup_lsp(bufnr)
+        local key_opts = { buffer = bufnr }
+        -- keys that only work when LSP is attached (so they are buffer-local)
+        vim.keymap.set('n', '<leader>r', vim.lsp.buf.rename, key_opts)
+        vim.keymap.set('n', '<leader>f', vim.lsp.buf.format, key_opts)
+        vim.keymap.set('n', 'K', function() vim.lsp.buf.hover({ border = "rounded" }) end, key_opts)
+        vim.keymap.set('n', 'gt', vim.lsp.buf.type_definition, key_opts)
+        -- code action menu
+        vim.keymap.set({ 'n', 'v' }, '<leader>a', vim.lsp.buf.code_action, key_opts)
+        -- signature help in input mode
+        vim.keymap.set('i', '<C-h>', vim.lsp.buf.signature_help, key_opts)
+        -- enable inlay hints (currently disabled by default)
+        vim.lsp.inlay_hint.enable(true, { bufnr })
+end
+
 function M.get_telescope_mappings()
     return {
         i = {
             ["<A-j>"] = "move_selection_next",
             ["<A-k>"] = "move_selection_previous",
         }
+    }
+end
+
+function M.get_codediff_mappings()
+    return {
+        view = {
+            quit = "<esc>",                    -- Close diff tab
+            toggle_explorer = "<leader>pT",  -- Toggle explorer visibility (explorer mode only)
+            next_hunk = "]c",   -- Jump to next change
+            prev_hunk = "[c",   -- Jump to previous change
+            next_file = "]f",   -- Next file in explorer mode
+            prev_file = "[f",   -- Previous file in explorer mode
+            -- diff_get = "do",    -- Get change from other buffer (like vimdiff)
+            -- diff_put = "dp",    -- Put change to other buffer (like vimdiff)
+        },
+        explorer = {
+            select = "o",    -- Open diff for selected file
+            --     hover = "K",        -- Show file diff preview
+            --     refresh = "R",      -- Refresh git status
+            toggle_view_mode = "i",  -- Toggle between 'list' and 'tree' views
+            toggle_stage = nil,--"s", -- Stage/unstage selected file
+            stage_all = nil,--"S",    -- Stage all files
+            unstage_all = nil,--"U",  -- Unstage all files
+            restore = nil--"x",      -- Discard changes (restore file)
+        },
+        conflict = {
+            accept_incoming = nil,--j"<leader>ct",  -- Accept incoming (theirs/left) change
+            accept_current = nil,--"<leader>co",   -- Accept current (ours/right) change
+            accept_both = nil,--"<leader>cb",      -- Accept both changes (incoming first)
+            discard = nil,--"<leader>cx",          -- Discard both, keep base
+            next_conflict = "]x",            -- Jump to next conflict
+            prev_conflict = "[x",            -- Jump to previous conflict
+            diffget_incoming = "2do",        -- Get hunk from incoming (left/theirs) buffer
+            diffget_current = "3do",         -- Get hunk from current (right/ours) buffer
+        },
+    }
+end
+
+function M.get_cmp_mappings()
+    local cmp = require('cmp')
+    return {
+        -- accept completion
+        ['<CR>'] = cmp.mapping.confirm({ select = false }),
+        -- trigger completion
+        ['<C-n>'] = cmp.mapping.complete(),
+        -- abort completion
+        ['<C-e>'] = cmp.mapping.abort(),
+        -- nagivate
+        ['<A-k>'] = cmp.mapping.select_prev_item(),
+        ['<A-j>'] = cmp.mapping.select_next_item(),
     }
 end
 

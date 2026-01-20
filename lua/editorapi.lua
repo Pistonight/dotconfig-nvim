@@ -539,7 +539,6 @@ end
 
 -- VIEW CHANGE / AI Coder =====================================================================
 
-local aicoder_started = false
 local was_aicoder_focused_when_aidiff_open = false
 local just_accepted_aidiff = false
 ---Switch to EDIT and open AI Coder
@@ -548,10 +547,6 @@ function M.editview_aicoder_open()
     if wint == M.wint.NTERM then return end
     if wint == M.wint.SPECIAL then return end
 
-    if not aicoder_started then
-        vim.cmd.ClaudeCodeStart()
-        aicoder_started = true
-    end
     M.editview_normalize(false)
     local tabid = M.query_tabid(M.tabt.EDIT)
     local filewins, termwins = M.editview_query_file_windows(tabid)
@@ -867,7 +862,7 @@ end
 
 --- Prompt for revs for diff
 function M.diffview_git_diff_new()
-    local _wint = M.query_wint();
+    local _wint = M.query_wint()
     if _wint == M.wint.SPECIAL then return end
     local tabid = M.query_tabid(M.tabt.DIFF)
     if tabid ~= nil then
@@ -892,12 +887,13 @@ end
 --- Open/Focus file tree
 ---@param sync boolean if true, sync the file in an already opened tree (NTree only)
 function M.open_file_tree(sync)
-    local _wint = M.query_wint();
+    local _wint = M.query_wint()
     if _wint == M.wint.SPECIAL then return end
     local tabt = M.query_tabt()
     if tabt == M.tabt.EDIT then
         if sync then
             require('nvim-tree.api').tree.find_file()
+            vim.defer_fn(vim.cmd.NvimTreeFocus, 50)
         else
             vim.cmd.NvimTreeOpen()
         end
@@ -910,6 +906,18 @@ function M.open_file_tree(sync)
                 vim.api.nvim_input("<leader>pT<C-w>h")
             end
         end, 50)
+    end
+end
+
+function M.multipurpose_toggle_shift_i()
+    local wint = M.query_wint()
+    if wint == M.wint.NTREE then
+        require("nvim-tree.api").tree.toggle_gitignore_filter()
+        return
+    end
+    if wint2tabt(wint) == M.tabt.EDIT then
+        vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
+        return
     end
 end
 

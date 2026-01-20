@@ -68,7 +68,11 @@ require("lazy").setup {
         }, {
             'esmuellert/codediff.nvim',                tag = "v2.9.3", pin = true,
             cmd = "CodeDiff",
-            config = function() require("config.codediff") end
+            config = function()
+                require("codediff").setup({
+                    keymaps = require("piston.keymaps").get_codediff_mappings()
+                })
+            end
         }, { -- codediff dependency
             'MunifTanjim/nui.nvim',                    commit = "de740991c12411b663994b2860f1a4fd0937c130", pin = true
         }, {
@@ -78,7 +82,12 @@ require("lazy").setup {
             -- L: their rewrite is broken
         }, {
             'nvim-treesitter/nvim-treesitter-context', commit = '64dd4cf3f6fd0ab17622c5ce15c91fc539c3f24a', pin = true, lazy = false,
-            config = function() require("config.nvim-treesitter-context") end
+            config = function()
+                require('treesitter-context').setup({
+                    enable = true,
+                    separator = '>',
+                })
+            end
         }, {
             'nvim-telescope/telescope.nvim',           commit = "4d0f5e0e7f69071e315515c385fab2a4eff07b3d", pin = true,
             cmd = "Telescope",
@@ -90,7 +99,10 @@ require("lazy").setup {
         },
 
         -- ## LANGUAGE SERVICE
-        {
+        { -- filetype detection .. this is what triggers the lazy loading of nvim-lspconfig
+            dir = configpath.."/lua/config/lsp", name = "lsp-filetypes", event = "BufNew",
+            config = function() require("config.lsp-filetypes") end
+        }, {
             'mason-org/mason-lspconfig.nvim',          commit = "9f9c67795d0795a6e8612f5a899ca64a074a1076", pin = true,
             config = function()
                 require("mason-lspconfig").setup({
@@ -108,19 +120,19 @@ require("lazy").setup {
         }, {
             'neovim/nvim-lspconfig',                   commit = "d696e36d5792daf828f8c8e8d4b9aa90c1a10c2a", pin = true
         }, {
-            dir = configpath.."/lua/config/lsp", name = "lsp-filetypes", event = "VimEnter",
-            config = function() require("config.lsp-filetypes") end
+            'felpafel/inlay-hint.nvim',                commit = "ee8aa9806d1e160a2bc08b78ae60568fb6d9dbce", pin = true,
+            event = "LspAttach",
+            config = function() require("config.inlay-hint") end
+        }, {
+            'hrsh7th/nvim-cmp',                        commit = "d97d85e01339f01b842e6ec1502f639b080cb0fc", pin = true,
+            event = "InsertEnter",
+            config = function() require("config.lsp-cmp") end
         },
-
-        -- { 'felpafel/inlay-hint.nvim',                commit = "ee8aa9806d1e160a2bc08b78ae60568fb6d9dbce", pin = true,
-        --     config = function() require("config.inlay-hint") end},
-        -- -- completion
-        { 'hrsh7th/nvim-cmp',                        commit = "d97d85e01339f01b842e6ec1502f639b080cb0fc", pin = true},
         { 'hrsh7th/cmp-nvim-lsp',                    commit = "cbc7b02bb99fae35cb42f514762b89b5126651ef", pin = true},
-        -- { 'hrsh7th/cmp-path',                        commit = "c642487086dbd9a93160e1679a1327be111cbc25", pin = true},
-        -- { 'hrsh7th/cmp-buffer',                      commit = "b74fab3656eea9de20a9b8116afa3cfc4ec09657", pin = true},
-        -- { 'hrsh7th/cmp-nvim-lsp-signature-help',     commit = "fd3e882e56956675c620898bf1ffcf4fcbe7ec84", pin = true},
-        -- { 'hrsh7th/cmp-nvim-lua',                    commit = "e3a22cb071eb9d6508a156306b102c45cd2d573d", pin = true},
+        { 'hrsh7th/cmp-path',                        commit = "c642487086dbd9a93160e1679a1327be111cbc25", pin = true},
+        { 'hrsh7th/cmp-buffer',                      commit = "b74fab3656eea9de20a9b8116afa3cfc4ec09657", pin = true},
+        { 'hrsh7th/cmp-nvim-lsp-signature-help',     commit = "fd3e882e56956675c620898bf1ffcf4fcbe7ec84", pin = true},
+        { 'hrsh7th/cmp-nvim-lua',                    commit = "e3a22cb071eb9d6508a156306b102c45cd2d573d", pin = true},
         -- language: java (jdtls)
         -- use { 'mfussenegger/nvim-jdtls',                 commit = "ece818f909c6414cbad4e1fb240d87e003e10fda",
         --     ft = { 'java' },
@@ -128,8 +140,11 @@ require("lazy").setup {
         -- }
 
         -- ## AI
-        -- { dir = vim.fn.stdpath("config") .. 'claudecode.nvim', name = "claudecode",
-        --     config = function() require("config.claudecode") end}
+        {
+            dir = configpath .. '/claudecode.nvim', name = "claudecode",
+            cmd = { "ClaudeCode", "ClaudeCodeTreeAdd", "ClaudeCodeAdd", "ClaudeCodeSend" },
+            config = function() require("config.claudecode") end
+        }
     },
     change_detection = { enabled = false }
 }

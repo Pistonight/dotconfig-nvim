@@ -842,3 +842,29 @@ index 48eefc3..847aba0 100644
        -- No active editor case - match VS Code format
        local no_editor_response = {
          success = false,
+diff --git a/plugin/claudecode.lua b/plugin/claudecode.lua
+index 5248095..b8fda58 100644
+--- a/plugin/claudecode.lua
++++ b/plugin/claudecode.lua
+@@ -1,21 +1,8 @@
+-if vim.fn.has("nvim-0.8.0") ~= 1 then
+-  vim.api.nvim_err_writeln("Claude Code requires Neovim >= 0.8.0")
+-  return
+-end
+-
+ if vim.g.loaded_claudecode then
+   return
+ end
+ vim.g.loaded_claudecode = 1
+ 
+---- Example: In your `init.lua`, you can set `vim.g.claudecode_auto_setup = { auto_start = true }`
+---- to automatically start ClaudeCode when Neovim loads.
+-if vim.g.claudecode_auto_setup then
+-  vim.defer_fn(function()
+-    require("claudecode").setup(vim.g.claudecode_auto_setup)
+-  end, 0)
+-end
+-
+ -- Commands are now registered in lua/claudecode/init.lua's _create_commands function
+ -- when require("claudecode").setup() is called.
+ -- This file (plugin/claudecode.lua) is primarily for the load guard

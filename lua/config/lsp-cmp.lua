@@ -1,17 +1,7 @@
 local cmp = require('cmp')
 cmp.setup({
     -- completion menu kep mapping
-    mapping = {
-        -- accept completion
-        ['<CR>'] = cmp.mapping.confirm({ select = false }),
-        -- trigger completion
-        ['<C-n>'] = cmp.mapping.complete(),
-        -- abort completion
-        ['<C-e>'] = cmp.mapping.abort(),
-        -- nagivate
-        ['<A-k>'] = cmp.mapping.select_prev_item(),
-        ['<A-j>'] = cmp.mapping.select_next_item(),
-    },
+    mapping = require("piston.keymaps").get_cmp_mappings(),
 
     -- Installed sources:
     sources = {
