@@ -301,7 +301,7 @@ def rmdir(path):
     try:
         if sys.platform == "win32":
             subprocess.run(
-                ["powershell", "-NoLogo", "-NoProfile", "-Command", f"rm -rf '{path}'"],
+                ["powershell", "-NoLogo", "-Command", f"rm -rf '{path}'"],
                 check=True,
             )
         else:
