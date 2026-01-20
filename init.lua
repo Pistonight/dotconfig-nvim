@@ -41,30 +41,51 @@ require("lazy").setup {
     -- L: Lock to this version because of an issue, put the issue link like L#123
     spec = {
         -- ## UI AND EDITOR FUNCTION
-        { 'nvim-tree/nvim-tree.lua',                 commit = "a0db8bf7d6488b1dcd9cb5b0dfd6684a1e14f769", pin = true, lazy = false, priority = 2000, -- needs to be before cat for colors in tree to load properly
-            config = function() require("config.nvim-tree") end },
-        { "catppuccin/nvim", name = "catppuccin",    commit = "cb5665990a797b102715188e73c44c3931b3b42e", pin = true, lazy = false, priority = 1000,
-            config = function() require("config.theme") end },
-        { 'nvim-tree/nvim-web-devicons',             commit = "6788013bb9cb784e606ada44206b0e755e4323d7", pin = true },
-        { 'nvim-lualine/lualine.nvim',               commit = "47f91c416daef12db467145e16bed5bbfe00add8", pin = true },
-        { 'terrortylor/nvim-comment',                commit = "e9ac16ab056695cad6461173693069ec070d2b23", pin = true, lazy = false, -- for some weird reason, keymap doesn't work when lazy loaded
+        {
+            'nvim-tree/nvim-tree.lua',                 commit = "a0db8bf7d6488b1dcd9cb5b0dfd6684a1e14f769", pin = true, lazy = false, priority = 2000, -- needs to be before cat for colors in tree to load properly
+            config = function() require("config.nvim-tree") end
+        }, {
+            "catppuccin/nvim", name = "catppuccin",    commit = "cb5665990a797b102715188e73c44c3931b3b42e", pin = true, lazy = false, priority = 1000,
+            config = function() require("config.theme") end
+        }, { 
+            'nvim-tree/nvim-web-devicons',             commit = "6788013bb9cb784e606ada44206b0e755e4323d7", pin = true
+        }, {
+            'nvim-lualine/lualine.nvim',               commit = "47f91c416daef12db467145e16bed5bbfe00add8", pin = true
+        }, {
+            'terrortylor/nvim-comment',                commit = "e9ac16ab056695cad6461173693069ec070d2b23", pin = true,
+            cmd = "CommentToggle",
             config = function()
                 require("nvim_comment").setup({ create_mappings = false })
-            end }, -- U
-        { 'mbbill/undotree',                         commit = "0f1c9816975b5d7f87d5003a19c53c6fd2ff6f7f", pin = true, lazy = false, --[[this is a vim plugin]] },
-        { 'voldikss/vim-floaterm', name="floaterm",  commit = "a11b930f55324e9b05e2ef16511fe713f1b456a7", pin = true, lazy = false, --[[this is a vim plugin]] },
-        --{ 'nvim-telescope/telescope.nvim',           commit = "4d0f5e0e7f69071e315515c385fab2a4eff07b3d", pin = true,
-        --    config = function() require("config.telescope")               end },
-        --{ 'nvim-telescope/telescope-ui-select.nvim', commit = "6e51d7da30bd139a6950adf2a47fda6df9fa06d2", pin = true },
-        --{ 'nvim-lua/plenary.nvim',                   commit = "b9fd5226c2f76c951fc8ed5923d85e4de065e509", pin = true },
-        --{ 'nvim-treesitter/nvim-treesitter',         branch = 'master', pin = true,
-        --    config = function() require("config.nvim-treesitter")         end }, -- L: their rewrite is broken
-        --{ 'nvim-treesitter/nvim-treesitter-context', commit = '64dd4cf3f6fd0ab17622c5ce15c91fc539c3f24a', pin = true,
-        --    config = function() require("config.nvim-treesitter-context") end },
-        --{ 'esmuellert/codediff.nvim',                tag = "v2.9.3", pin = true,
-        --    config = function() require("config.codediff") end},
-        -- codediff dependency
-        --{ 'MunifTanjim/nui.nvim',                    commit = "de740991c12411b663994b2860f1a4fd0937c130", pin = true},
+            end
+            -- U: UNMAINTAINED
+        }, {
+            'mbbill/undotree',                         commit = "0f1c9816975b5d7f87d5003a19c53c6fd2ff6f7f", pin = true,
+            cmd = "UndotreeToggle"
+        }, {
+            'voldikss/vim-floaterm', name="floaterm",  commit = "a11b930f55324e9b05e2ef16511fe713f1b456a7", pin = true,
+            cmd = "FloatermToggle"
+        }, {
+            'esmuellert/codediff.nvim',                tag = "v2.9.3", pin = true,
+            cmd = "CodeDiff",
+            config = function() require("config.codediff") end
+        }, { -- codediff dependency
+            'MunifTanjim/nui.nvim',                    commit = "de740991c12411b663994b2860f1a4fd0937c130", pin = true
+        }, {
+            'nvim-treesitter/nvim-treesitter',         branch = 'master', pin = true, lazy = false,
+            config = function() require("config.nvim-treesitter")         end
+            -- L: their rewrite is broken
+        }, {
+            'nvim-treesitter/nvim-treesitter-context', commit = '64dd4cf3f6fd0ab17622c5ce15c91fc539c3f24a', pin = true, lazy = false,
+            config = function() require("config.nvim-treesitter-context") end
+        }, {
+            'nvim-telescope/telescope.nvim',           commit = "4d0f5e0e7f69071e315515c385fab2a4eff07b3d", pin = true,
+            cmd = "Telescope",
+            config = function() require("config.telescope")               end
+        }, {
+            'nvim-telescope/telescope-ui-select.nvim', commit = "6e51d7da30bd139a6950adf2a47fda6df9fa06d2", pin = true
+        }, { -- telescope dependency
+            'nvim-lua/plenary.nvim',                   commit = "b9fd5226c2f76c951fc8ed5923d85e4de065e509", pin = true
+        },
 
         -- ## LANGUAGE SERVICE
         -- { 'neovim/nvim-lspconfig',                   commit = "d696e36d5792daf828f8c8e8d4b9aa90c1a10c2a", pin = true},
