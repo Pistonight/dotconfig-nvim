@@ -41,6 +41,9 @@ require("lazy").setup {
     -- U: Upstream appears to be unmaintained. No need to check for updates
     -- L: Lock to this version because of an issue, put the issue link like L#123
     spec = {
+        {
+            "lazy/lazy.nvim", tag = "v11.17.5", lazy = false, priority = 9999
+        },
         -- ## UI AND EDITOR FUNCTION
         {
             'nvim-tree/nvim-tree.lua',                 commit = "a0db8bf7d6488b1dcd9cb5b0dfd6684a1e14f769", pin = true, lazy = false, priority = 2000, -- needs to be before cat for colors in tree to load properly
