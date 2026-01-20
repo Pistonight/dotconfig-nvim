@@ -1,12 +1,7 @@
 local telescope = require('telescope')
 telescope.setup({
     defaults = {
-        mappings = {
-            i = {
-                ["<A-j>"] = "move_selection_next",
-                ["<A-k>"] = "move_selection_previous",
-            }
-        }
+        mappings = require("piston.keymaps").get_telescope_mappings()
     },
     extensions = {
         ["ui-select"] = {

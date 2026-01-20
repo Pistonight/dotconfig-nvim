@@ -1,3 +1,5 @@
+local M = {}
+
 vim.api.nvim_create_autocmd("LspAttach", {
     callback = function(event)
         local bufid = event.buf
@@ -42,4 +44,12 @@ for _, method in ipairs({
     end
 end
 
-require("config.lsp-lua")
+-- ensure dependencies are loaded
+require("lspconfig")
+require("mason-lspconfig")
+
+function M.enable(lspserver)
+    vim.lsp.enable(lspserver)
+end
+
+return M

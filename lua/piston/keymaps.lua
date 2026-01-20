@@ -140,4 +140,13 @@ function M.setup_nvim_tree(bufnr)
     vim.keymap.set('n', 'g?', api.tree.toggle_help, opts('Help'))
 end
 
+function M.get_telescope_mappings()
+    return {
+        i = {
+            ["<A-j>"] = "move_selection_next",
+            ["<A-k>"] = "move_selection_previous",
+        }
+    }
+end
+
 return M
