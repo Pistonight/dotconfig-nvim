@@ -66,14 +66,79 @@ def main():
 
 def nuke():
     """Nuke existing configurations."""
-    # TODO: Implement nuke command
-    print("nuke: not implemented")
+    NUKE_DRY_RUN = True
+
+    info = read_info()
+    data_path = get_std_data_path()
+    config_path = get_std_config_path()
+
+    # Path specs to remove. Use * suffix for starts-with pattern.
+    specs = [
+        "data:shada/main.shada.tmp.*",
+        "data:log",
+        "data:lsp.log",
+        "data:site/pack",
+        "data:mason",
+        "config:cache",
+        "config:after",
+        "config:external",
+        "config:plugin",
+    ]
+    for rel_path in info["shaft"]["data-paths"]:
+        specs.append(f"data:{rel_path}")
+    specs.append(f"data:{info['lazy']['data-path']}")
+    specs.append(f"config:{info['claude']['config-path']}")
+    specs.append(f"data:{info['claude']['data-path']}")
+
+    for spec in specs:
+        nuke_spec(spec, data_path, config_path, NUKE_DRY_RUN)
+
+
+def nuke_spec(spec, data_path, config_path, dry_run):
+    """Remove paths matching a spec. Supports * suffix for starts-with pattern."""
+    if spec.startswith("data:"):
+        base_path = data_path
+        pattern = spec[5:]
+    elif spec.startswith("config:"):
+        base_path = config_path
+        pattern = spec[7:]
+    else:
+        print(f"nuke: invalid spec '{spec}', must start with 'data:' or 'config:'")
+        return
+
+    def do_nuke(path):
+        if dry_run:
+            print(f"would nuke: {path}")
+        else:
+            rmdir(path) if os.path.isdir(path) else os.remove(path)
+            print(f"nuked: {path}")
+
+    if pattern.endswith("*"):
+        # Starts-with pattern
+        prefix = pattern[:-1]
+        parent_dir = os.path.dirname(prefix) or "."
+        name_prefix = os.path.basename(prefix)
+        search_dir = os.path.join(base_path, parent_dir)
+
+        if not os.path.isdir(search_dir):
+            return
+
+        for entry in os.listdir(search_dir):
+            if entry.startswith(name_prefix):
+                full_path = os.path.join(search_dir, entry)
+                do_nuke(full_path)
+    else:
+        # Exact path
+        full_path = os.path.join(base_path, pattern)
+        if os.path.exists(full_path):
+            do_nuke(full_path)
 
 
 def apply():
     """Apply updated configurations."""
     info = read_info()
     data_path = get_std_data_path()
+    config_path = get_std_config_path()
 
     for rel_path in info["shaft"]["data-paths"]:
         dir_path = os.path.join(data_path, rel_path)
@@ -84,6 +149,17 @@ def apply():
     lazy = info["lazy"]
     lazy_path = os.path.join(data_path, lazy["data-path"])
     checkout_repo(lazy_path, lazy["repo"], lazy["tag"], False, None)
+
+    claude = info["claude"]
+    repo_path = os.path.join(data_path, claude["data-path"])
+    local_path = os.path.join(config_path, claude["config-path"])
+    patch_path = os.path.join(config_path, claude["patch"])
+    sparse_paths = claude["sparse"]
+    checkout_repo(repo_path, claude["repo"], claude["commit"], True, sparse_paths)
+    if os.path.isfile(patch_path):
+        apply_patch(patch_path, repo_path)
+        print(f"applied patch: {patch_path}")
+    rec_clone_paths(repo_path, local_path, sparse_paths)
 
 
 def merge():
@@ -153,37 +229,14 @@ def repack():
         print(f"repack: local config not found at {local_path}")
         sys.exit(1)
 
-    # Set up the repo with sparse checkout and shallow clone
     checkout_repo(repo_path, claude["repo"], base_commit, True, sparse_paths)
-
-    # Replace each sparse path in the repo with the local config version
-    for sparse_path in sparse_paths:
-        # Remove trailing slash if present for path operations
-        sparse_dir = sparse_path.rstrip("/")
-
-        repo_sparse_path = os.path.join(repo_path, sparse_dir)
-        local_sparse_path = os.path.join(local_path, sparse_dir)
-
-        if not os.path.exists(local_sparse_path):
-            print(f"repack: local path not found: {local_sparse_path}")
-            continue
-
-        # Delete the directory in the repo
-        if os.path.exists(repo_sparse_path):
-            rmdir(repo_sparse_path)
-
-        # Copy the local version to the repo
-        shutil.copytree(local_sparse_path, repo_sparse_path)
-        print(f"copied: {local_sparse_path} -> {repo_sparse_path}")
-
-    # Generate diff from the dirty working tree
+    rec_clone_paths(local_path, repo_path, sparse_paths)
     result = subprocess.run(
         ["git", "-C", repo_path, "diff"],
         capture_output=True,
         text=True,
         check=True,
     )
-
     if not result.stdout.strip():
         print("repack: no changes detected")
         return
@@ -263,6 +316,24 @@ def is_worktree_dirty(path):
         text=True,
     )
     return bool(result.stdout.strip())
+
+
+def rec_clone_paths(src_base, dst_base, paths):
+    """Clone paths from src_base to dst_base, deleting existing destinations."""
+    for rel_path in paths:
+        rel_dir = rel_path.rstrip("/")
+        src_path = os.path.join(src_base, rel_dir)
+        dst_path = os.path.join(dst_base, rel_dir)
+
+        if not os.path.exists(src_path):
+            print(f"rec_clone_paths: source not found: {src_path}")
+            continue
+
+        if os.path.exists(dst_path):
+            rmdir(dst_path)
+
+        shutil.copytree(src_path, dst_path)
+        print(f"copied: {src_path} -> {dst_path}")
 
 
 def write_patch(path, content):

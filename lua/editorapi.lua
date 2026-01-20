@@ -757,13 +757,13 @@ function M.aicoder_send(visual)
     end
     if visual then
         vim.api.nvim_input("gv<cmd>ClaudeCodeSend<cr>")
-        -- need to defer to realize the send above first
-        vim.defer_fn(function()
-            M.editview_aicoder_open()
-        end, 200)
     else
         vim.cmd("ClaudeCodeAdd %")
     end
+    -- need to defer to realize the send above first
+    vim.defer_fn(function()
+        M.editview_aicoder_open()
+    end, 200)
 end
 
 function M.aicoder_is_diff_bufname(bufname)
