@@ -386,17 +386,21 @@ def restore_work_tree(path):
 
 def checkout_repo(path, repo, ref, shallow, sparse):
     path = os.path.abspath(path)
+    repo = f"https://github.com/{repo}"
     if os.path.exists(path):
         if is_worktree_dirty(path):
             print(f"checkout_repo: unclean work tree at {path}")
             exit(1)
     else:
-        os.makedirs(path)
-        subprocess.run(["git", "-C", path, "init"], check=True)
-        subprocess.run(
-            ["git", "-C", path, "remote", "add", "origin", f"https://github.com/{repo}"],
-            check=True,
-        )
+        if shallow:
+            os.makedirs(path)
+            subprocess.run(["git", "-C", path, "init"], check=True)
+            subprocess.run(
+                ["git", "-C", path, "remote", "add", "origin", repo],
+                check=True,
+            )
+        else:
+            subprocess.run(["git", "clone", repo, path], check=True)
 
     if sparse:
         subprocess.run(
