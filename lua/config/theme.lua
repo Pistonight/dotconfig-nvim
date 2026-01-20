@@ -126,8 +126,8 @@ require("catppuccin").setup({
         },
         -- For more plugins integrations please scroll down (https://github.com/catppuccin/nvim#integrations)
     },
-    -- set pre-compiled path to be inside config
-    compile_path = vim.fn.stdpath("config") .. "/cache/catppuccin",
+    -- set pre-compiled path to be inside data
+    compile_path = vim.fn.stdpath("data") .. "/catppuccin",
 })
 vim.cmd.colorscheme('catppuccin')
 

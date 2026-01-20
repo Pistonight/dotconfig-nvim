@@ -1,70 +1,19 @@
--- # General Configuration
+
 local editorapi = require("editorapi")
 
--- line numbers
-vim.opt.number = true    -- Enable line numbers
-vim.opt.rnu = true       -- Relative line numbers by default
--- hidden characters (controlled by keymapping)
-vim.opt.listchars = "tab:▸ ,trail:·,nbsp:␣,extends:»,precedes:«,eol:↲"
--- indent
-vim.opt.expandtab = true -- Tab become spaces
-vim.opt.shiftwidth = 4   -- Indent 4
-vim.opt.tabstop = 4
-vim.opt.softtabstop = 4
-vim.opt.smartindent = true
-vim.opt.wrap = false
+local M = {}
 
-vim.opt.fillchars:append { diff = "╱" }
-
-vim.opt.termguicolors = true -- colors
--- undo dir
-vim.opt.swapfile = false
-vim.opt.backup = false
-vim.opt.undofile = true
-local home = os.getenv('HOME')
-if home == nil then
-    home = os.getenv('USERPROFILE')
-end
-if home ~= nil then
-    vim.opt.undodir = home .. '/.vim/undodir'
-end
-
--- folds
-vim.opt.foldenable = false   -- no fold at startup
-vim.opt.foldlevel = 99
-vim.opt.foldmethod = 'expr'
-vim.opt.foldexpr = 'v:lua.vim.treesitter.foldexpr()'
--- search
-vim.opt.hlsearch = true
-vim.opt.incsearch = true -- should be the default
--- scrolling
-vim.opt.scrolloff = 8
-vim.opt.sidescrolloff = 8
-
--- Floaterm style
-vim.g.floaterm_title = 'Terminal [$1/$2]'
--- Undotree style
-vim.g.undotree_WindowLayout = 0
-vim.g.undotree_SetFocusWhenToggle = 1
-
--- ## Diagnostics
-vim.diagnostic.config({
-    virtual_text = true,
-    float = {
-        border = 'rounded',
-    }
-})
-
--- ## Keys
-local _ = (function()
-    -- helper for remapping
-    local function noremap(mode, lhs, rhs, opts)
-        local options = { noremap = true }
-        if opts then
-            options = vim.tbl_extend('force', options, opts)
-        end
-        vim.keymap.set(mode, lhs, rhs, options)
+-- helper for remapping
+local function noremap(mode, lhs, rhs, opts)
+    local options = { noremap = true }
+    if opts then
+        options = vim.tbl_extend('force', options, opts)
     end
+    vim.keymap.set(mode, lhs, rhs, options)
+end
+
+---Setup global keymaps
+function M.setup()
     -- toggle relative line number
     noremap('n', '<leader>0', function() vim.o.relativenumber = not vim.o.relativenumber end)
     -- toggle show hidden characters (like eol, tab, etc.)
@@ -147,10 +96,48 @@ local _ = (function()
     -- focus on tree (edit mode and diff mode)
     noremap('n', '<leader>t', function() editorapi.open_file_tree(false) end)
     noremap('n', '<leader>T', function() editorapi.open_file_tree(true) end)
+end
 
+---Setup key maps for nvim tree buffer
+function M.setup_nvim_tree(bufnr)
+    local function opts(desc)
+        return {
+            desc = 'nvim-tree: ' .. desc,
+            buffer = bufnr,
+            noremap = true,
+            silent = true,
+            nowait = true
+        }
+    end
+    local api = require("nvim-tree.api")
+    vim.keymap.set('n', '<C-k>', api.node.show_info_popup, opts('Info'))
+    vim.keymap.set('n', 'O', api.node.navigate.parent_close, opts('Close parent'))
+    vim.keymap.set('n', 'P', api.node.navigate.parent, opts('Go to parent'))
+    vim.keymap.set('n', 'm', api.fs.rename_sub, opts('Move'))
+    vim.keymap.set('n', 'o', api.node.open.edit, opts('Open'))
+    vim.keymap.set('n', 'v', require("editorapi").editview_open_split , opts('Open: vertical'))
+    vim.keymap.set('n', 's', api.node.open.horizontal, opts('Open: split'))
+    vim.keymap.set('n', 'a', api.fs.create, opts('Create'))
+    vim.keymap.set('n', 'c', api.fs.copy.node, opts('Copy'))
+    vim.keymap.set('n', 'p', api.fs.paste, opts('Paste'))
+    vim.keymap.set('n', 'd', api.fs.remove, opts('Delete'))
+    vim.keymap.set('n', 'D', api.fs.trash, opts('Trash'))
+    vim.keymap.set('n', 'x', api.fs.cut, opts('Cut'))
+    vim.keymap.set('n', 'r', api.fs.rename_sub, opts('Rename'))
+    vim.keymap.set('n', '-', api.marks.toggle, opts('Select'))
+    vim.keymap.set('n', 'bd', api.marks.bulk.delete, opts('Delete: selected'))
+    vim.keymap.set('n', 'bm', api.marks.bulk.move, opts('Move: selected'))
+    vim.keymap.set('n', '[', api.node.navigate.diagnostics.prev, opts('Prev diagnostic'))
+    vim.keymap.set('n', ']', api.node.navigate.diagnostics.next, opts('Next diagnostic'))
+    vim.keymap.set('n', 'B', api.tree.toggle_no_buffer_filter, opts('Toggle opened'))
+    vim.keymap.set('n', 'H', api.tree.toggle_hidden_filter, opts('Toggle dotfiles'))
+    vim.keymap.set('n', 'I', api.tree.toggle_gitignore_filter, opts('Toggle gitignore'))
+    vim.keymap.set('n', 'q', api.tree.close, opts('Close'))
+    vim.keymap.set('n', 'R', api.tree.reload, opts('Refresh'))
+    vim.keymap.set('n', 'gy', api.fs.copy.absolute_path, opts('Copy absolute path'))
+    vim.keymap.set('n', 'y', api.fs.copy.filename, opts('Copy name'))
+    vim.keymap.set('n', 'Y', api.fs.copy.relative_path, opts('Copy relative path'))
+    vim.keymap.set('n', 'g?', api.tree.toggle_help, opts('Help'))
+end
 
-    -- Other key mappings that requires plugin to be loaded first
-    -- telescope.lua
-    -- lsp-config.lua
-    -- nvim-tree.lua
-end)()
+return M

@@ -1,5 +1,5 @@
 diff --git a/lua/claudecode/diff.lua b/lua/claudecode/diff.lua
-index 7e1b8f0..4aa0faa 100644
+index 7e1b8f0..3d2f060 100644
 --- a/lua/claudecode/diff.lua
 +++ b/lua/claudecode/diff.lua
 @@ -243,7 +243,7 @@ local function display_terminal_in_new_tab()
@@ -286,7 +286,7 @@ index 7e1b8f0..4aa0faa 100644
 +    return nil, "Could not determine HOME or USERPROFILE directory"
 +  end
 +
-+  local dir = home .. "/.vim/claude"
++  local dir = vim.fn.stdpath("data") .. "/piston/aicoder"
 +  local stat = vim.loop.fs_stat(dir)
 +
 +  if not stat then

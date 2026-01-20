@@ -45,6 +45,7 @@ def remove_local_repo() -> None:
         return
     try:
         shutil.rmtree(LOCAL_REPO_PATH)
+        return
     except OSError:
         print(f"ERROR: Failed to remove {LOCAL_REPO_PATH}, will retry", file=sys.stderr)
         time.sleep(2)
