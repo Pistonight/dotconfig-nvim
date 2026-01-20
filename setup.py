@@ -298,25 +298,13 @@ def rmdir(path):
         return
     except Exception:
         pass
-    try:
-        if sys.platform == "win32":
-            subprocess.run(
-                ["powershell", "-NoLogo", "-Command", f"rm -rf '{path}'"],
-                check=True,
-            )
-        else:
-            subprocess.run(["rm", "-rf", path], check=True)
-        return
-    except Exception:
-        pass
     if sys.platform == "win32":
         subprocess.run(
             ["powershell", "-NoLogo", "-NoProfile", "-Command", f"Remove-Item -Recurse -Force '{path}'"],
             check=True,
         )
     else:
-        print(f"fail to remove {path}")
-        exit(1)
+        subprocess.run(["rm", "-rf", path], check=True)
 
 
 def is_worktree_dirty(path):
