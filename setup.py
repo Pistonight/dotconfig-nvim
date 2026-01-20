@@ -66,7 +66,7 @@ def main():
 
 def nuke():
     """Nuke existing configurations."""
-    NUKE_DRY_RUN = True
+    NUKE_DRY_RUN = False
 
     info = read_info()
     data_path = get_std_data_path()
@@ -77,8 +77,11 @@ def nuke():
         "data:shada/main.shada.tmp.*",
         "data:log",
         "data:lsp.log",
+        "data:mason.log",
+        "data:luasnip.log",
         "data:site/pack",
         "data:mason",
+        "data:tree-sitter-*",
         "config:cache",
         "config:after",
         "config:external",
@@ -92,6 +95,14 @@ def nuke():
 
     for spec in specs:
         nuke_spec(spec, data_path, config_path, NUKE_DRY_RUN)
+
+    vim_path = os.path.expanduser("~/.vim")
+    if os.path.exists(vim_path):
+        if NUKE_DRY_RUN:
+            print(f"would nuke: {vim_path}")
+        else:
+            rmdir(vim_path)
+            print(f"nuked: {vim_path}")
 
 
 def nuke_spec(spec, data_path, config_path, dry_run):

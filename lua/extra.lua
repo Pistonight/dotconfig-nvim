@@ -17,24 +17,25 @@ set shellcmdflag=-command
 set shellquote="
 set shellxquote=
 ]])
+
         vim.cmd([[
 augroup YankToScript
   autocmd!
-  autocmd TextYankPost * if v:register == 'a' | call writefile([getreg('a')], $LOCALAPPDATA .. '/nvim/.yank') | silent! execute '!(Get-Content $env:LOCALAPPDATA/nvim/.yank) -replace "`0","`n" | set-clipboard' | redraw! | endif
+  autocmd TextYankPost * if v:register == 'a' | call writefile([getreg('a')], stdpath('data').. '/.yank') | silent! execute '!(Get-Content '..stdpath('data')..'/.yank) -replace "`0","`n" | set-clipboard' | redraw! | endif
 augroup END
         ]])
     elseif vim.fn.executable("wl-copy") ~= 0 then
         vim.cmd([[
 augroup YankToScript
   autocmd!
-  autocmd TextYankPost * if v:register == 'a' | call writefile([getreg('a')], '/tmp/yank') | silent! execute '!bash -c "cat /tmp/yank | tr ''\0'' ''\n'' | wl-copy -n"' | redraw! | endif
+  autocmd TextYankPost * if v:register == 'a' | call writefile([getreg('a')], stdpath('data')..'/.yank') | silent! execute '!bash -c "cat '..stdpath('data')..'/.yank | tr ''\0'' ''\n'' | wl-copy -n"' | redraw! | endif
 augroup END
         ]])
     else
         vim.cmd([[
 augroup YankToScript
   autocmd!
-  autocmd TextYankPost * if v:register == 'a' | call writefile([getreg('a')], '/tmp/yank') | silent! execute '!bash -c "source ~/.bashrc && cat /tmp/yank | websocat -1 -t -u ws://$HOST_MACHINE_IP:8881"' | redraw! | endif
+  autocmd TextYankPost * if v:register == 'a' | call writefile([getreg('a')], stdpath('data')..'/.yank') | silent! execute '!bash -c "source ~/.bashrc && cat '..stdpath('data')..'/.yank | websocat -1 -t -u ws://$HOST_MACHINE_IP:8881"' | redraw! | endif
 augroup END
         ]])
     end
