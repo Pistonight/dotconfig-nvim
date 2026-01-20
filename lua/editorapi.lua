@@ -244,6 +244,7 @@ function M.calc_wint_fast(winid)
     if filetype == "claude-notify"     then return M.wint.NOTIF end
     if filetype == "floaterm"          then return M.wint.FLOAT end
     if filetype == "lazy"              then return M.wint.SPECIAL end
+    if filetype == "mason"             then return M.wint.SPECIAL end
 
     local buftype = vim.bo[bufnr].buftype
     if buftype == "terminal"           then return M.wint.NTERM end

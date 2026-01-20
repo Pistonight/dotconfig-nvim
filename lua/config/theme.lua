@@ -63,6 +63,7 @@ require("catppuccin").setup({
             ["@type.builtin.cpp"] = { link = "Type" },
             ["@lsp.type.interface"] = {link = "Type"},
             ["@tag.tsx"] = { link = "Type" },
+            ["@tag.javascript"] = { link = "Type" },
 
             -- punctuation
             Operator = { fg = mocha.sapphire },

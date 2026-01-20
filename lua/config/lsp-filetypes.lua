@@ -1,12 +1,19 @@
 local SERVERS = {
     lua_ls = { config = true },
-    pyright = {}
+    pyright = {},
+    eslint = {},
+    ts_ls = {},
+    rust_analyzer = {},
 }
 local FILE_TYPES = {
-    lua = { "lua_ls" },
-    python = { "pyright" },
+    lua = "lua_ls",
+    python = "pyright",
+    typescript = { "eslint", "ts_ls" },
+    typescriptreact = { "eslint", "ts_ls" },
+    javascript = "ts_ls",
+    rust = "rust_analyzer",
 }
-local warn = function(msg) vim.notify("lsp_filetypes: "..msg, vim.log.levels.WARN) end
+local warn = function(msg) vim.notify("lsp_filetypes: "..msg, vim.log.levels.INFO) end
 -- Autocommand to auto-load LSP configs based on filetype
 vim.api.nvim_create_autocmd("FileType", {
     callback = function()
@@ -16,16 +23,21 @@ vim.api.nvim_create_autocmd("FileType", {
             return
         end
         FILE_TYPES[ft] = nil -- remove the config for the file type that we already enabled
+        if type(servers) == "string" then
+            servers = { servers }
+        end
+        local enabled = {}
         for _, s in ipairs(servers) do
             local config = SERVERS[s]
             if config then
                 SERVERS[s] = nil    -- remove the config for the server that we enabled
                 if config.config then
                     require("config.lsp."..s)
-                    require("config.lsp").enable(s)
-                    warn("enabled server '"..s.."' for file type '"..ft.."'")
                 end
+                require("config.lsp").enable(s)
+                table.insert(enabled, s)
             end
         end
+        warn("enabled "..vim.inspect(enabled).." for file type '"..ft.."'")
     end
 })
