@@ -86,6 +86,7 @@ def nuke():
         "config:after",
         "config:external",
         "config:plugin",
+        "config:lua/claudecode",
     ]
     for rel_path in info["shaft"]["data-paths"]:
         specs.append(f"data:{rel_path}")
@@ -336,10 +337,12 @@ def rec_clone_paths(src_base, dst_base, paths):
 
 
 def write_patch(path, content):
-    """Write patch content to file, normalizing line endings on Windows."""
+    """Write patch content to file as bytes to preserve line endings."""
+    if isinstance(content, str):
+        content = content.encode("utf-8")
     if sys.platform == "win32":
-        content = content.replace("\r\n", "\n")
-    with open(path, "w", newline="\n") as f:
+        content = content.replace(b"\r\n", b"\n")
+    with open(path, "wb") as f:
         f.write(content)
 
 
@@ -348,15 +351,14 @@ def apply_patch(patch_path, repo_path):
     result = subprocess.run(
         ["git", "-C", repo_path, "apply", patch_path],
         capture_output=True,
-        text=True,
     )
     if result.returncode == 0:
         return
 
     if sys.platform == "win32":
-        with open(patch_path, "r") as f:
+        with open(patch_path, "rb") as f:
             content = f.read()
-        if "\r\n" in content:
+        if b"\r\n" in content:
             temp_patch = patch_path + ".tmp"
             try:
                 write_patch(temp_patch, content)
