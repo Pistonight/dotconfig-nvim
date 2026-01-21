@@ -93,7 +93,7 @@ require("lazy").setup {
             end
         }, {
             'nvim-telescope/telescope.nvim',           commit = "4d0f5e0e7f69071e315515c385fab2a4eff07b3d", pin = true,
-            cmd = "Telescope",
+            cmd = "Telescope", event = "LspAttach",
             config = function() require("config.telescope")               end
         }, {
             'nvim-telescope/telescope-ui-select.nvim', commit = "6e51d7da30bd139a6950adf2a47fda6df9fa06d2", pin = true
