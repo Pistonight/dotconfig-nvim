@@ -1,4 +1,10 @@
 local cmp = require('cmp')
+-- ensure sources are loaded
+require("cmp_nvim_lsp")
+require("cmp_path")
+require("cmp_buffer")
+require("cmp_nvim_lsp_signature_help")
+-- cmp_nvim_lua is not loaded because ft=lua will already load it
 cmp.setup({
     -- completion menu kep mapping
     mapping = require("piston.keymaps").get_cmp_mappings(),
