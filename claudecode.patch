@@ -1,5 +1,5 @@
 diff --git a/lua/claudecode/diff.lua b/lua/claudecode/diff.lua
-index 7e1b8f0..3d2f060 100644
+index 7e1b8f0..347b71c 100644
 --- a/lua/claudecode/diff.lua
 +++ b/lua/claudecode/diff.lua
 @@ -243,7 +243,7 @@ local function display_terminal_in_new_tab()
@@ -254,7 +254,7 @@ index 7e1b8f0..3d2f060 100644
 +    old_file_path = old_file_path,
 +  }
 +
-+    local editorapi = require("editorapi")
++    local editorapi = require("piston.editorapi")
 +    if editorapi.aicoder_check_auto_open_diff() then
 +        -- open diff
 +        vim.defer_fn(M.open_code_diff, 200)
@@ -693,7 +693,7 @@ index c4b7744..00f2063 100644
      local cmd_args = opts.args and opts.args ~= "" and opts.args or nil
      M.open_with_model(cmd_args)
 diff --git a/lua/claudecode/selection.lua b/lua/claudecode/selection.lua
-index 9bbfed9..1aa851a 100644
+index 9bbfed9..986ec86 100644
 --- a/lua/claudecode/selection.lua
 +++ b/lua/claudecode/selection.lua
 @@ -129,7 +129,9 @@ function M.update_selection()
@@ -702,7 +702,7 @@ index 9bbfed9..1aa851a 100644
    -- If the buffer name starts with "term://" and contains "claude", do not update selection
 -  if buf_name and buf_name:match("^term://") and buf_name:lower():find("claude", 1, true) then
 +  if (buf_name and buf_name:match("^term://") and buf_name:lower():find("claude", 1, true))
-+        or require("editorapi").aicoder_is_diff_bufname(buf_name)
++        or require("piston.editorapi").aicoder_is_diff_bufname(buf_name)
 +    then
      -- Optionally, cancel demotion timer like for the terminal
      if M.state.demotion_timer then
@@ -830,7 +830,7 @@ index 2b4c7c9..e9b4807 100644
          end
        end
 diff --git a/lua/claudecode/tools/get_current_selection.lua b/lua/claudecode/tools/get_current_selection.lua
-index 48eefc3..847aba0 100644
+index 48eefc3..47b1769 100644
 --- a/lua/claudecode/tools/get_current_selection.lua
 +++ b/lua/claudecode/tools/get_current_selection.lua
 @@ -41,7 +41,7 @@ local function handler(params)
@@ -838,7 +838,7 @@ index 48eefc3..847aba0 100644
      local buf_name = vim.api.nvim_buf_get_name(current_buf)
  
 -    if not buf_name or buf_name == "" then
-+    if not buf_name or buf_name == "" or require("editorapi").aicoder_is_diff_bufname(buf_name) then
++    if not buf_name or buf_name == "" or require("piston.editorapi").aicoder_is_diff_bufname(buf_name) then
        -- No active editor case - match VS Code format
        local no_editor_response = {
          success = false,

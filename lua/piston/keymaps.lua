@@ -1,5 +1,5 @@
 
-local editorapi = require("editorapi")
+local editorapi = require("piston.editorapi")
 
 local M = {}
 
@@ -97,6 +97,10 @@ function M.setup()
     noremap('n', '<leader>t', function() editorapi.open_file_tree(false) end)
     noremap('n', '<leader>T', function() editorapi.open_file_tree(true) end)
 
+    -- fix lsp (the key bind is from :e which tends to fix most issues but not always)
+    noremap('n', '<leader>e', function() editorapi.fix_buffer_issues(false) end)
+    noremap('n', '<leader>E', function() editorapi.fix_buffer_issues(true) end)
+
     noremap({'n', 'v'}, 'I', editorapi.multipurpose_toggle_shift_i)
 end
 
@@ -117,7 +121,7 @@ function M.setup_nvim_tree(bufnr)
     vim.keymap.set('n', 'P', api.node.navigate.parent, opts('Go to parent'))
     vim.keymap.set('n', 'm', api.fs.rename_sub, opts('Move'))
     vim.keymap.set('n', 'o', api.node.open.edit, opts('Open'))
-    vim.keymap.set('n', 'v', require("editorapi").editview_open_split , opts('Open: vertical'))
+    vim.keymap.set('n', 'v', editorapi.editview_open_split , opts('Open: vertical'))
     vim.keymap.set('n', 's', api.node.open.horizontal, opts('Open: split'))
     vim.keymap.set('n', 'a', api.fs.create, opts('Create'))
     vim.keymap.set('n', 'c', api.fs.copy.node, opts('Copy'))

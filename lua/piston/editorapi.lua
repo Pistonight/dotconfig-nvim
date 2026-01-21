@@ -984,6 +984,29 @@ function M.jump_diagnostic(count, error_only)
     end, 50)
 end
 
+---Fix issues in the buffer, such as highlighting and diagnostics
+function M.fix_buffer_issues(restart_lsp)
+    local bufnr = vim.api.nvim_get_current_buf()
+    if vim.bo[bufnr].modified then
+        M.warn("please save the file first")
+        return
+    end
+    local line_count = vim.api.nvim_buf_line_count(bufnr)
+    -- trigger some change to force lsp rethink
+    vim.api.nvim_buf_set_lines(bufnr, line_count, line_count, false, { "" })
+    vim.cmd("silent! write!")
+    -- get rid of stale diagnostics
+    vim.diagnostic.reset(nil, bufnr)
+    -- undo the change
+    vim.api.nvim_buf_set_lines(bufnr, line_count, line_count + 1, false, {})
+    vim.cmd("silent! write!")
+    vim.cmd("edit")
+    if restart_lsp then
+        vim.cmd.LspRestart()
+    end
+    M.warn("buffer reset")
+end
+
 -- HELPERS =============================================================================
 
 
