@@ -172,6 +172,7 @@ def apply():
         apply_patch(patch_path, repo_path)
         print(f"applied patch: {patch_path}")
     rec_clone_paths(repo_path, local_path, sparse_paths)
+    restore_work_tree(repo_path)
 
 
 def merge():
@@ -256,8 +257,6 @@ def repack():
     # Write the patch
     write_patch(patch_path, result.stdout)
     print(f"repack: patch written to {patch_path}")
-
-    # Restore the work tree
     restore_work_tree(repo_path)
 
 
