@@ -74,6 +74,15 @@ vim.api.nvim_create_autocmd("BufEnter", {
 
     end
 })
+vim.api.nvim_create_autocmd("VimLeavePre", {
+    callback = function()
+        for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+            if vim.bo[bufnr].buftype == "terminal" then
+                vim.api.nvim_buf_delete(bufnr, { force = true })
+            end
+        end
+    end
+})
 
 -- STATES
 -- making editorapi stateful for better performance. for example,
