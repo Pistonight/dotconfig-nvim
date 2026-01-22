@@ -4,7 +4,7 @@
 vim.opt.number = true    -- Enable line numbers
 vim.opt.rnu = true       -- Relative line numbers by default
 -- hidden characters (controlled by keymapping)
-vim.opt.listchars = "tab:▸ ,trail:·,nbsp:␣,extends:»,precedes:«,eol:↲"
+vim.opt.listchars = "tab:▸ ,space:·,trail:·,nbsp:␣,extends:»,precedes:«,eol:↲"
 -- indent
 vim.opt.expandtab = true -- Tab become spaces
 vim.opt.shiftwidth = 4   -- Indent 4

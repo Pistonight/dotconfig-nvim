@@ -443,11 +443,14 @@ end
 
 -- VIEW CHANGE / Telescope =====================================================================
 
-local telescope_is_opened_from_aicoder = false
+local telescope_opened_wint = M.wint.INVALID
 local telescope_attach_file_picker_mappings = function(bufnr, _)
-    if telescope_is_opened_from_aicoder then
-        local actions = require "telescope.actions"
-        local action_state = require "telescope.actions.state"
+    if telescope_opened_wint == M.wint.NFILE or telescope_opened_wint == M.wint.INVALID then
+        return true
+    end
+    local actions = require "telescope.actions"
+    local action_state = require "telescope.actions.state"
+    if telescope_opened_wint == M.wint.NTERM then
         actions.select_default:replace(function()
             actions.close(bufnr)
             local selection = action_state.get_selected_entry()
@@ -455,6 +458,15 @@ local telescope_attach_file_picker_mappings = function(bufnr, _)
             vim.defer_fn(function()
                 M.editview_aicoder_open()
             end, 50)
+        end)
+    else
+        actions.select_default:replace(function()
+            actions.close(bufnr)
+            local selection = action_state.get_selected_entry()
+            local ntree_actions = require("nvim-tree.actions")
+            -- manually call nvim tree action to avoid the tree being closed and re-opened
+            -- causing motion sickness
+            ntree_actions.node.open_file.fn("", selection[1])
         end)
     end
     return true
@@ -464,7 +476,7 @@ function M.editview_openfinder_last()
     local wint = M.query_wint()
     if wint == M.wint.TELES then return end
     if wint == M.wint.SPECIAL then return end
-    telescope_is_opened_from_aicoder = wint == M.wint.NTERM
+    telescope_opened_wint = wint
     M.editview_normalize(false)
     vim.cmd("Telescope resume")
 end
@@ -473,7 +485,7 @@ function M.editview_openfinder_file()
     local wint = M.query_wint()
     if wint == M.wint.TELES then return end
     if wint == M.wint.SPECIAL then return end
-    telescope_is_opened_from_aicoder = wint == M.wint.NTERM
+    telescope_opened_wint = wint
     M.editview_normalize(false)
     require('telescope.builtin').find_files {
         attach_mappings = telescope_attach_file_picker_mappings
@@ -484,7 +496,7 @@ function M.editview_openfinder_live_grep()
     local wint = M.query_wint()
     if wint == M.wint.TELES then return end
     if wint == M.wint.SPECIAL then return end
-    telescope_is_opened_from_aicoder = wint == M.wint.NTERM
+    telescope_opened_wint = wint
     M.editview_normalize(false)
     require('telescope.builtin').live_grep {
         attach_mappings = telescope_attach_file_picker_mappings
@@ -495,7 +507,7 @@ function M.editview_openfinder_buffer()
     local wint = M.query_wint()
     if wint == M.wint.TELES then return end
     if wint == M.wint.SPECIAL then return end
-    telescope_is_opened_from_aicoder = wint == M.wint.NTERM
+    telescope_opened_wint = wint
     M.editview_normalize(false)
     require('telescope.builtin').buffers {
         attach_mappings = telescope_attach_file_picker_mappings
@@ -506,7 +518,7 @@ function M.editview_openfinder_symbol()
     local wint = M.query_wint()
     if wint == M.wint.TELES then return end
     if wint == M.wint.SPECIAL then return end
-    telescope_is_opened_from_aicoder = false
+    telescope_opened_wint = M.wint.INVALID
     M.editview_normalize(false)
     require("telescope.builtin").treesitter()
 end
@@ -515,7 +527,7 @@ function M.editview_openfinder_definition()
     local wint = M.query_wint()
     if wint == M.wint.TELES then return end
     if wint == M.wint.SPECIAL then return end
-    telescope_is_opened_from_aicoder = false
+    telescope_opened_wint = M.wint.INVALID
     M.editview_normalize(false)
     require("telescope.builtin").lsp_definitions()
 end
@@ -524,7 +536,7 @@ function M.editview_openfinder_reference()
     local wint = M.query_wint()
     if wint == M.wint.TELES then return end
     if wint == M.wint.SPECIAL then return end
-    telescope_is_opened_from_aicoder = false
+    telescope_opened_wint = M.wint.INVALID
     M.editview_normalize(false)
     require("telescope.builtin").lsp_references()
 end
@@ -533,7 +545,7 @@ function M.editview_openfinder_implementation()
     local wint = M.query_wint()
     if wint == M.wint.TELES then return end
     if wint == M.wint.SPECIAL then return end
-    telescope_is_opened_from_aicoder = false
+    telescope_opened_wint = M.wint.INVALID
     M.editview_normalize(false)
     require("telescope.builtin").lsp_implementations()
 end
@@ -542,7 +554,7 @@ function M.editview_openfinder_diagnostic()
     local wint = M.query_wint()
     if wint == M.wint.TELES then return end
     if wint == M.wint.SPECIAL then return end
-    telescope_is_opened_from_aicoder = false
+    telescope_opened_wint = M.wint.INVALID
     M.editview_normalize(false)
     require("telescope.builtin").diagnostics({ bufnr = 0})
 end
@@ -926,7 +938,8 @@ function M.multipurpose_toggle_shift_i()
         return
     end
     if wint2tabt(wint) == M.tabt.EDIT then
-        vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
+        -- toggle show hidden characters (like eol, tab, etc.)
+        vim.o.list = not vim.o.list
         return
     end
 end

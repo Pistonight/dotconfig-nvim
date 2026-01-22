@@ -16,8 +16,6 @@ end
 function M.setup()
     -- toggle relative line number
     noremap('n', '<leader>0', function() vim.o.relativenumber = not vim.o.relativenumber end)
-    -- toggle show hidden characters (like eol, tab, etc.)
-    noremap('n', '<leader>$', function() vim.o.list = not vim.o.list end)
     -- turn off search highlight
     noremap('n', '<leader> ', vim.cmd.nohlsearch)
     -- cursor movement
@@ -60,6 +58,13 @@ function M.setup()
     noremap('n', '<leader>c', vim.cmd.CommentToggle)
     noremap('v', '<leader>c', "V<cmd>'<,'>CommentToggle<cr>gv")
 
+    -- view helpers
+    noremap('n', '<leader>vi', function()
+        vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
+    end)
+    local ibl_enabled = false
+    noremap('n', '<leader>vg', function() if ibl_enabled then vim.cmd.IBLToggle() return end ibl_enabled = true vim.cmd.IBLEnable() end)
+
     -- view change
     -- toggle undotree
     noremap('n', '<leader>u', vim.cmd.UndotreeToggle)
@@ -82,9 +87,9 @@ function M.setup()
     noremap('n', 'gr', editorapi.editview_openfinder_reference)
     noremap('n', 'gd', editorapi.editview_openfinder_definition)
     noremap('n', 'gi', editorapi.editview_openfinder_implementation)
-    noremap('n', '<leader>vd', editorapi.editview_openfinder_diagnostic)
+    noremap('n', '<leader>fd', editorapi.editview_openfinder_diagnostic)
     -- ai coder
-    noremap('n', '<leader>bb', editorapi.editview_aicoder_open)
+    noremap({'n', 'v'}, '<leader>bb', editorapi.editview_aicoder_open)
     noremap({'n', 't'}, '<leader>bg', editorapi.aicoder_close)
     noremap({'n', 't'}, '<leader>bv', editorapi.aicoder_open_or_accept_diff)
     noremap({'n', 't'}, '<leader>bd', editorapi.aicoder_deny_diff)

@@ -62,6 +62,11 @@ require("lazy").setup {
             end
             -- U: UNMAINTAINED
         }, {
+            "lukas-reineke/indent-blankline.nvim",     commit = "005b56001b2cb30bfa61b7986bc50657816ba4ba", pin = true,
+            cmd = { "IBLToggle", "IBLEnable", "IBLDisable" },
+            config = function() require("ibl").setup() end
+        },
+        {
             'mbbill/undotree',                         commit = "0f1c9816975b5d7f87d5003a19c53c6fd2ff6f7f", pin = true,
             cmd = "UndotreeToggle"
         }, {
