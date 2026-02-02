@@ -24,8 +24,6 @@ vim.opt.undodir = vim.fn.stdpath("data") .. '/piston/undodir'
 -- folds
 vim.opt.foldenable = false   -- no fold at startup
 vim.opt.foldlevel = 99
-vim.opt.foldmethod = 'expr'
-vim.opt.foldexpr = 'v:lua.vim.treesitter.foldexpr()'
 -- search
 vim.opt.hlsearch = true
 vim.opt.incsearch = true -- should be the default
