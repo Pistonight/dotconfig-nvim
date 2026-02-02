@@ -90,7 +90,7 @@ require("lazy").setup {
         -- }, {
         }, {
             'nvim-treesitter/nvim-treesitter',         commit = '4967fa48b0fe7a7f92cee546c76bb4bb61bb14d5', lazy = false,
-            build = ":TSUpdatew",
+            build = ":TSUpdate",
             config = function() require("config.nvim-treesitter")         end
         }, {
             'nvim-treesitter/nvim-treesitter-context', commit = '64dd4cf3f6fd0ab17622c5ce15c91fc539c3f24a', lazy = false,
