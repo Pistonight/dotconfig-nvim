@@ -1,2 +1,3 @@
 /claudecode.nvim
 /lua/piston/cache
+/lua/piston/config_gen.lua
