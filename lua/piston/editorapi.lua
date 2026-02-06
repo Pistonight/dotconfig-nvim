@@ -561,10 +561,18 @@ end
 
 -- VIEW CHANGE / AI Coder =====================================================================
 
+local is_aicoder_installed = nil
 local was_aicoder_focused_when_aidiff_open = false
 local just_accepted_aidiff = false
 ---Switch to EDIT and open AI Coder
 function M.editview_aicoder_open()
+    if is_aicoder_installed == nil then
+        is_aicoder_installed = vim.fn.executable("claude") == 1
+    end
+    if not is_aicoder_installed then
+        M.warn("aicoder is not installed on this system")
+        return
+    end
     local wint = M.query_wint()
     if wint == M.wint.NTERM then return end
     if wint == M.wint.SPECIAL then return end
